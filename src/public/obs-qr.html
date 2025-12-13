@@ -13,7 +13,7 @@
     
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: transparent; /* שקוף ל-OBS */
+      background: transparent;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -160,22 +160,11 @@
       color: #64ffda;
     }
     
-    .phone-display {
-      font-size: 22px;
+    .counter {
+      font-size: 18px;
       font-weight: bold;
-      color: #fff;
+      color: #25D366;
       margin-top: 10px;
-      font-family: monospace;
-      letter-spacing: 2px;
-    }
-    
-    .pulse {
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
     }
     
     .controls {
@@ -220,6 +209,17 @@
       font-size: 11px;
       color: #5a6270;
     }
+    
+    .proxy-indicator {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(100, 255, 218, 0.1);
+      border: 1px solid rgba(100, 255, 218, 0.3);
+      border-radius: 4px;
+      color: #64ffda;
+      font-size: 11px;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -244,9 +244,9 @@
     
     <div id="session-info" class="session-info" style="display: none;">
       <span class="label">Session:</span> <span id="session-id">-</span><br>
-      <div id="phone-container" style="display: none;">
-        <span class="label">Phone:</span>
-        <div id="phone-number" class="phone-display">-</div>
+      <span id="proxy-display" class="proxy-indicator" style="display: none;">🌐 Proxy: <span id="proxy-id">-</span></span>
+      <div class="counter">
+        מחוברים: <span id="connected-count">0</span>
       </div>
     </div>
     
@@ -261,51 +261,65 @@
   </div>
 
   <script>
-    // קרא API Key מ-URL או localStorage
+    // קרא API Key ופרוקסי מ-URL
     const urlParams = new URLSearchParams(window.location.search);
     const API_KEY = urlParams.get('key') || localStorage.getItem('wa_api_key') || 'test-key';
+    const FIXED_PROXY = urlParams.get('proxy') || null; // פרוקסי קבוע מה-URL
     
-    let currentSessionId = urlParams.get('session') || null;
+    let currentSessionId = null;
     let pollInterval = null;
     let isCreatingSession = false;
+    let connectedCount = 0;
+    let lastQRData = null;
     
     // אתחול
     document.addEventListener('DOMContentLoaded', () => {
-      if (currentSessionId) {
-        // יש סשן ספציפי - עקוב אחריו
-        startPolling(currentSessionId);
-      } else {
-        // צור סשן חדש אוטומטית
-        createNewSession();
-      }
+      createNewSession();
     });
     
-    // יצירת סשן חדש
+    // יצירת סשן חדש עם פרוקסי
     async function createNewSession() {
       if (isCreatingSession) return;
       isCreatingSession = true;
+      
+      // עצור polling קודם
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
       
       updateStatus('waiting', '⏳ יוצר סשן חדש...');
       showLoading();
       
       try {
+        const body = {};
+        
+        // אם יש פרוקסי קבוע - השתמש בו
+        if (FIXED_PROXY) {
+          body.proxy = FIXED_PROXY;
+        }
+        
         const response = await fetch('/api/sessions/provision', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-API-KEY': API_KEY
           },
-          body: JSON.stringify({
-            // ללא phone - יקבל ממתין לסריקה
-          })
+          body: JSON.stringify(body)
         });
         
         const data = await response.json();
         
         if (data.sessionId) {
           currentSessionId = data.sessionId;
-          document.getElementById('session-id').textContent = currentSessionId;
+          document.getElementById('session-id').textContent = currentSessionId.slice(-12);
           document.getElementById('session-info').style.display = 'block';
+          
+          // הצג פרוקסי אם יש
+          if (data.proxyId || FIXED_PROXY) {
+            document.getElementById('proxy-display').style.display = 'inline-block';
+            document.getElementById('proxy-id').textContent = (data.proxyId || FIXED_PROXY).slice(-15);
+          }
           
           updateStatus('ready', '✅ סשן נוצר! ממתין ל-QR...');
           startPolling(currentSessionId);
@@ -317,12 +331,10 @@
         updateStatus('error', `❌ שגיאה: ${err.message}`);
         isCreatingSession = false;
         
-        // נסה שוב אחרי 10 שניות רק אם אין סשן פעיל
-        if (!currentSessionId) {
-          setTimeout(() => {
-            createNewSession();
-          }, 10000);
-        }
+        // נסה שוב אחרי 10 שניות
+        setTimeout(() => {
+          createNewSession();
+        }, 10000);
         return;
       }
       
@@ -350,49 +362,22 @@
         const data = await response.json();
         
         if (data.qrCode || data.qr) {
-          // יש QR - הצג אותו
-          showQR(data.qrCode || data.qr);
+          const qrData = data.qrCode || data.qr;
+          // רק עדכן אם ה-QR השתנה
+          if (qrData !== lastQRData) {
+            lastQRData = qrData;
+            showQR(qrData);
+          }
           updateStatus('ready', '📱 סרוק את הקוד להתחברות');
-        } else if (data.status === 'CONNECTED' || data.connected) {
-          // מחובר!
-          showConnected(data.phone || data.phoneNumber);
+        } else if (data.sessionStatus === 'CONNECTED' || data.status === 'CONNECTED') {
+          // מחובר! עבור לסשן הבא
+          showConnected();
         } else if (response.status === 404) {
-          // QR עדיין לא מוכן - ממתינים (לא יוצרים סשן חדש!)
+          // QR עדיין לא מוכן
           updateStatus('waiting', '⏳ ממתין ל-QR מהשרת...');
-        } else {
-          updateStatus('waiting', '⏳ ממתין ל-QR...');
         }
       } catch (err) {
         console.error('QR check error:', err);
-        // שגיאת רשת - ממשיכים לנסות
-        updateStatus('waiting', '⏳ מחפש QR...');
-      }
-    }
-    
-    // בדיקת סטטוס סשן
-    async function checkSessionStatus(sessionId) {
-      try {
-        const response = await fetch(`/api/v1/dashboard/sessions`, {
-          headers: { 'X-API-KEY': API_KEY }
-        });
-        
-        const data = await response.json();
-        
-        if (data.data) {
-          const sessions = Object.values(data.data);
-          const session = sessions.find(s => s.sessionId === sessionId);
-          
-          if (session) {
-            if (session.status === 'CONNECTED') {
-              showConnected(session.phone);
-            } else if (session.qr) {
-              showQR(session.qr);
-              updateStatus('ready', '📱 סרוק את הקוד להתחברות');
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Status check error:', err);
       }
     }
     
@@ -400,42 +385,28 @@
     function showQR(qrData) {
       const qrContent = document.getElementById('qr-content');
       
-      // אם זה כבר base64 image
       if (qrData.startsWith('data:image')) {
         qrContent.innerHTML = `<img id="qr-image" src="${qrData}" alt="QR Code">`;
       } else {
-        // נסה להציג כתמונה מ-URL או base64
-        qrContent.innerHTML = `<img id="qr-image" src="${qrData}" alt="QR Code" onerror="generateQRImage('${qrData}')">`;
+        qrContent.innerHTML = `<img id="qr-image" src="${qrData}" alt="QR Code">`;
       }
     }
     
-    // יצירת תמונת QR מטקסט
-    function generateQRImage(text) {
-      // Fallback - הצג טקסט של ה-QR
-      const qrContent = document.getElementById('qr-content');
-      qrContent.innerHTML = `
-        <div style="padding: 20px; background: #f0f0f0; border-radius: 10px; word-break: break-all; font-size: 10px; max-width: 200px;">
-          ${text.substring(0, 100)}...
-        </div>
-      `;
-    }
-    
-    // הצגת מצב מחובר
-    function showConnected(phone) {
+    // הצגת מצב מחובר ויצירת סשן חדש
+    function showConnected() {
+      connectedCount++;
+      document.getElementById('connected-count').textContent = connectedCount;
+      
       const qrContent = document.getElementById('qr-content');
       qrContent.innerHTML = `
         <div style="text-align: center; color: #25D366;">
           <div style="font-size: 80px; margin-bottom: 10px;">✅</div>
           <div style="font-size: 18px; font-weight: bold;">מחובר!</div>
+          <div style="font-size: 14px; color: #888; margin-top: 10px;">יוצר סשן חדש...</div>
         </div>
       `;
       
-      updateStatus('connected', '🟢 WhatsApp מחובר!');
-      
-      if (phone) {
-        document.getElementById('phone-container').style.display = 'block';
-        document.getElementById('phone-number').textContent = phone;
-      }
+      updateStatus('connected', `🟢 מחובר! (${connectedCount} סה"כ)`);
       
       // עצור polling
       if (pollInterval) {
@@ -443,10 +414,12 @@
         pollInterval = null;
       }
       
-      // אחרי 10 שניות - צור סשן חדש אוטומטית
+      lastQRData = null;
+      
+      // אחרי 3 שניות - צור סשן חדש אוטומטית
       setTimeout(() => {
         createNewSession();
-      }, 10000);
+      }, 3000);
     }
     
     // הצגת טעינה
@@ -470,6 +443,7 @@
     // רענון QR
     function refreshQR() {
       if (currentSessionId) {
+        lastQRData = null;
         checkQR(currentSessionId);
       } else {
         createNewSession();
@@ -478,4 +452,3 @@
   </script>
 </body>
 </html>
-
