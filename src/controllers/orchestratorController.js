@@ -629,6 +629,8 @@ async function listWorkersHandler(req, res, next) {
  */
 async function provisionSession(req, res, next) {
   try {
+    console.log('[provisionSession] Request body:', JSON.stringify(req.body));
+    
     const { phone, sessionId: customSessionId, sessionsPath, proxy: manualProxy } = req.body;
     
     // Phone is optional - will be set after QR scan
@@ -636,6 +638,7 @@ async function provisionSession(req, res, next) {
     
     // Step 1: Generate session ID
     const allocSessionId = customSessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    console.log('[provisionSession] Generated sessionId:', allocSessionId);
     
     const { getRedis } = require("../infra/redis");
     const redis = getRedis();
@@ -656,9 +659,12 @@ async function provisionSession(req, res, next) {
     // (but anti-ban will be less effective)
     
     // Step 3: Allocate session
+    console.log('[provisionSession] Allocating session with proxies:', availableProxies.length > 0 ? availableProxies : ['no-proxy']);
     const allocResult = await allocateSession(phoneValue, allocSessionId, availableProxies.length > 0 ? availableProxies : ['no-proxy']);
+    console.log('[provisionSession] Allocation result:', JSON.stringify(allocResult));
     
     if (!allocResult.success) {
+      console.log('[provisionSession] Allocation failed:', allocResult.reason);
       return res.status(409).json({ 
         status: "error", 
         reason: allocResult.reason,
@@ -700,7 +706,12 @@ async function provisionSession(req, res, next) {
       message: "Session provisioned and worker started"
     });
   } catch (err) {
-    return next(err);
+    console.error('[provisionSession] Error:', err.message, err.stack);
+    return res.status(500).json({
+      status: "error",
+      reason: err.message || "INTERNAL_ERROR",
+      phase: "exception"
+    });
   }
 }
 
