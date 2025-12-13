@@ -61,6 +61,7 @@ nano .env            # Add your proxies
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Full deployment guide
 - [docs/SYSTEM_OVERVIEW.md](docs/SYSTEM_OVERVIEW.md) - **System overview (24/7, isolation, learning)**
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [docs/ANTIBAN_SERVER_SPEC.md](docs/ANTIBAN_SERVER_SPEC.md) - **Anti-Ban Server (Dispatcher) full specification**
 - [docs/PROXY_ARCHITECTURE.md](docs/PROXY_ARCHITECTURE.md) - Proxy management
 - [docs/SCAN_FLOW_SPEC.md](docs/SCAN_FLOW_SPEC.md) - Session creation flow
 - [API.md](API.md) - API documentation

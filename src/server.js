@@ -30,6 +30,11 @@ app.get("/health", async (_req, res) => {
 });
 
 // Dashboard UI routes
+// Landing page: QR scan only (simple)
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "scan.html"));
+});
+
 app.get("/dashboard", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });

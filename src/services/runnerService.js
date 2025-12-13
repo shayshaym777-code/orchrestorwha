@@ -16,7 +16,13 @@ const docker = new Docker();
 // Use the worker image built by docker-compose (or custom image)
 const WORKER_IMAGE = process.env.WORKER_IMAGE || "whatsapp-orchestrator-worker-1:latest";
 const SESSIONS_VOLUME_PATH = process.env.SESSIONS_VOLUME_PATH || "/opt/whatsapp-orchestrator/sessions";
-const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || "http://wa_orchestrator:3000";
+// IMPORTANT:
+// - When Orchestrator runs on the HOST and Workers run in Docker (common on Windows),
+//   "wa_orchestrator" is NOT resolvable from the worker container.
+// - "host.docker.internal" works on Docker Desktop (Windows/Mac) and points to the host.
+// - For pure docker-compose deployments you can override WEBHOOK_BASE_URL to
+//   "http://wa_orchestrator:3000" or "http://172.28.0.3:3000".
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || "http://host.docker.internal:3000";
 const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || "http://host.docker.internal:4000";
 const MEDIA_INTERNAL_KEY = process.env.MEDIA_INTERNAL_KEY || "";
 
@@ -91,7 +97,10 @@ async function startWorker(sessionId, options = {}) {
     const containerPath = `/app/sessions/${sessionId}`;
     
     // Docker network name (from docker-compose)
-    const DOCKER_NETWORK = process.env.DOCKER_NETWORK || "whatsapp-orchestrator_whatsapp-network";
+    // Default to "bridge" for host-run orchestrator setups.
+    // If you're running the full docker-compose stack, set DOCKER_NETWORK=whatsapp-orchestrator_whatsapp-network
+    // (or your compose network name).
+    const DOCKER_NETWORK = process.env.DOCKER_NETWORK || "bridge";
     
     // Create container
     const container = await docker.createContainer({

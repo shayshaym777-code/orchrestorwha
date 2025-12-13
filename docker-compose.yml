@@ -59,6 +59,7 @@ services:
       - API_KEY=${API_KEY:-change-me-api-key}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      # If you run Dispatcher on host, keep default DISPATCHER_URL in host env; otherwise override here
       - SESSIONS_DIR=/app/sessions
       - BACKUPS_DIR=/app/backups
       - MAX_BACKUPS=7
@@ -88,7 +89,10 @@ services:
     restart: unless-stopped
     environment:
       - SESSION_ID=worker_1
-      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      # Default works when all services run in this compose network (recommended)
+      # Override via .env if you run Orchestrator on the host:
+      # ORCHESTRATOR_BASE_URL=http://host.docker.internal:3000
+      - WEBHOOK_URL=${ORCHESTRATOR_BASE_URL:-http://wa_orchestrator:3000}/api/webhook
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
       - PROXY_URL=${PROXY_URL_1}
       - ENABLE_KEEP_ALIVE=true
@@ -112,7 +116,7 @@ services:
     restart: unless-stopped
     environment:
       - SESSION_ID=worker_2
-      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_URL=${ORCHESTRATOR_BASE_URL:-http://wa_orchestrator:3000}/api/webhook
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
       - PROXY_URL=${PROXY_URL_2}
       - ENABLE_KEEP_ALIVE=true
@@ -136,7 +140,7 @@ services:
     restart: unless-stopped
     environment:
       - SESSION_ID=worker_3
-      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_URL=${ORCHESTRATOR_BASE_URL:-http://wa_orchestrator:3000}/api/webhook
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
       - PROXY_URL=${PROXY_URL_3}
       - ENABLE_KEEP_ALIVE=true
@@ -160,7 +164,7 @@ services:
     restart: unless-stopped
     environment:
       - SESSION_ID=worker_4
-      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_URL=${ORCHESTRATOR_BASE_URL:-http://wa_orchestrator:3000}/api/webhook
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
       - PROXY_URL=${PROXY_URL_4}
       - ENABLE_KEEP_ALIVE=true
@@ -186,7 +190,7 @@ services:
     restart: unless-stopped
     environment:
       - SESSION_ID=worker_5
-      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_URL=${ORCHESTRATOR_BASE_URL:-http://wa_orchestrator:3000}/api/webhook
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
       - PROXY_URL=${PROXY_URL_5}
       - ENABLE_KEEP_ALIVE=true

@@ -1,4 +1,4 @@
-const { getRedis } = require("../infra/redis");
+const { getRedis, getRedisBlocking } = require("../infra/redis");
 
 function outboxKey(sessionId) {
   return `session:outbox:${sessionId}`;
@@ -33,11 +33,12 @@ async function enqueueOutbox(sessionId, task, { ttlSeconds = 3600 } = {}) {
  * Returns { raw, task } or null if timeout.
  */
 async function claimOutbox(sessionId, { timeoutSeconds = 20, processingTtlSeconds = 3600 } = {}) {
-  const redis = getRedis();
-  const raw = await redis.brpoplpush(outboxKey(sessionId), processingKey(sessionId), timeoutSeconds);
+  const redisBlocking = getRedisBlocking();
+  const raw = await redisBlocking.brpoplpush(outboxKey(sessionId), processingKey(sessionId), timeoutSeconds);
   if (!raw) return null;
 
   // Keep processing list bounded in time; if worker dies, watchdog can requeue.
+  const redis = getRedis();
   await redis.expire(processingKey(sessionId), processingTtlSeconds);
 
   let task = null;

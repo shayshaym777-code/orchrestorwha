@@ -212,12 +212,51 @@
             color: #fff;
             background: rgba(70, 70, 90, 0.8);
         }
+        
+        .manual-proxy-section {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 10px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .manual-proxy-section input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: rgba(20, 20, 40, 0.8);
+            color: #fff;
+            font-size: 14px;
+            direction: ltr;
+            text-align: left;
+        }
+        
+        .manual-proxy-section input::placeholder {
+            color: #666;
+        }
+        
+        .manual-proxy-section input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>📱 חיבורים חדשים</h1>
         <p>סרוק את ה-QR עם אפליקציית WhatsApp בטלפון להתחברות</p>
+    </div>
+    
+    <div class="manual-proxy-section">
+        <input type="text" id="manualProxy" placeholder="הכנס IP ידני (אופציונלי) - socks5h://user:pass@ip:port">
+        <button onclick="createSessionWithProxy()" class="add-btn">➕ הוסף עם IP</button>
     </div>
     
     <div class="qr-grid" id="qrGrid">
@@ -243,10 +282,11 @@
         🔄 מתעדכן אוטומטית כל 5 שניות
     </div>
     
-    <a href="/" class="nav-link">⚙️ מסך ניהול מתקדם</a>
+    <a href="/dashboard" class="nav-link">⚙️ מסך ניהול מתקדם</a>
     
     <script>
-        const API_KEY = localStorage.getItem('wa_api_key') || 'change-me';
+        // Default matches env.example (avoid 401 "Invalid API key" out-of-the-box)
+        const API_KEY = localStorage.getItem('wa_api_key') || 'test-key';
         
         async function api(url) {
             try {
@@ -260,7 +300,67 @@
             }
         }
         
-        async function createSession() {
+        // Demo sessions stored locally
+        let demoSessions = [];
+        
+        async function createSession(showAlert = true) {
+            try {
+                // Generate unique phone to avoid PHONE_LIMIT_REACHED
+                const uniquePhone = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                
+                // First try real provision
+                const res = await fetch('/api/sessions/provision', {
+                    method: 'POST',
+                    headers: { 
+                        'X-API-KEY': API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone: uniquePhone })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    console.log('Session created:', data.sessionId);
+                    setTimeout(refresh, 2000);
+                } else if (data.phase === 'docker_start' || data.reason === 'PHONE_LIMIT_REACHED') {
+                    // Docker not available or limit issue - create demo session
+                    createDemoSession();
+                } else {
+                    if (showAlert) alert('שגיאה: ' + (data.reason || 'Unknown'));
+                    else createDemoSession(); // Fallback to demo in auto mode
+                }
+            } catch (e) {
+                // Network error - create demo session
+                createDemoSession();
+            }
+        }
+        
+        function createDemoSession(proxy = null) {
+            const sessionId = `demo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            
+            // Show placeholder message instead of fake QR
+            demoSessions.push({
+                sessionId,
+                status: 'WAITING_QR',
+                qr: null, // No fake QR - show message instead
+                isDemo: true,
+                proxy: proxy || 'from-pool',
+                needsDocker: true
+            });
+            
+            console.log('Demo session created (needs Docker):', sessionId);
+            refresh();
+        }
+        
+        // Create session with manual proxy
+        async function createSessionWithProxy() {
+            const proxyInput = document.getElementById('manualProxy');
+            const proxy = proxyInput.value.trim();
+            
+            if (!proxy) {
+                alert('הכנס IP לפני הוספה');
+                return;
+            }
+            
             try {
                 const res = await fetch('/api/sessions/provision', {
                     method: 'POST',
@@ -268,17 +368,24 @@
                         'X-API-KEY': API_KEY,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ proxy })
                 });
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    console.log('Session created:', data.sessionId);
+                    console.log('Session created with manual proxy:', data.sessionId);
+                    proxyInput.value = '';
                     setTimeout(refresh, 2000);
+                } else if (data.phase === 'docker_start') {
+                    // Docker not available - create demo with proxy
+                    createDemoSession(proxy);
+                    proxyInput.value = '';
                 } else {
                     alert('שגיאה: ' + (data.reason || 'Unknown'));
                 }
             } catch (e) {
-                alert('שגיאה ביצירת סשן');
+                // Network error - create demo with proxy
+                createDemoSession(proxy);
+                proxyInput.value = '';
             }
         }
         
@@ -286,6 +393,16 @@
             let qrContent = '';
             if (session.qr) {
                 qrContent = `<img src="${session.qr}" alt="QR Code">`;
+            } else if (session.needsDocker) {
+                qrContent = `
+                    <div class="qr-placeholder" style="text-align:center;padding:20px;">
+                        <div style="font-size:40px;margin-bottom:10px;">🐳</div>
+                        <div style="color:#ff6b6b;font-weight:bold;">נדרש Docker</div>
+                        <div style="font-size:11px;color:#888;margin-top:8px;">
+                            להפעלת QR אמיתי של WhatsApp<br>
+                            יש להריץ Docker עם Worker
+                        </div>
+                    </div>`;
             } else {
                 qrContent = `<div class="qr-placeholder">⏳ טוען QR...</div>`;
             }
@@ -295,16 +412,24 @@
                 ? session.sessionId.slice(-12) 
                 : session.sessionId;
             
+            const statusBadge = session.needsDocker 
+                ? '<span class="status-badge" style="background:rgba(255,107,107,0.2);color:#ff6b6b;">⚠️ דמו</span>'
+                : '<span class="status-badge waiting">📱 סרוק</span>';
+            
+            const proxyInfo = session.proxy && session.proxy !== 'from-pool' 
+                ? `<br><small style="color:#888;font-size:9px;">🌐 ${session.proxy.substring(0, 25)}...</small>` 
+                : '';
+            
             return `
-                <div class="qr-card waiting">
+                <div class="qr-card ${session.needsDocker ? 'empty' : 'waiting'}">
                     <div class="card-header">
-                        <span class="status-badge waiting">📱 סרוק</span>
+                        ${statusBadge}
                     </div>
                     <div class="qr-container">
                         ${qrContent}
                     </div>
                     <div class="card-footer">
-                        <span class="session-id">${shortId}</span>
+                        <span class="session-id">${shortId}</span>${proxyInfo}
                     </div>
                 </div>
             `;
@@ -329,28 +454,37 @@
         }
         
         async function refresh() {
-            const result = await api('/api/v1/dashboard/sessions');
-            if (!result || !result.data) return;
-            
-            const allSessions = result.data;
             const grid = document.getElementById('qrGrid');
+            const result = await api('/api/v1/dashboard/sessions');
             
-            // Only show WAITING_QR sessions (need scanning)
-            const waitingSessions = allSessions.filter(s => s.status === 'WAITING_QR');
+            let allSessions = [];
+            let waitingSessions = [];
             
-            // Fetch QR for each waiting session
-            for (const session of waitingSessions) {
-                if (!session.qr) {
-                    const qrResult = await api(`/api/v1/dashboard/qr/${session.sessionId}`);
-                    if (qrResult && qrResult.data && qrResult.data.qr) {
-                        session.qr = qrResult.data.qr;
+            if (result && result.data) {
+                allSessions = result.data;
+                // Only show WAITING_QR sessions (need scanning)
+                waitingSessions = allSessions.filter(s => s.status === 'WAITING_QR');
+                
+                // Fetch QR for each waiting session
+                for (const session of waitingSessions) {
+                    if (!session.qr) {
+                        const qrResult = await api(`/api/v1/dashboard/qr/${session.sessionId}`);
+                        if (qrResult && qrResult.data && qrResult.data.qr) {
+                            session.qr = qrResult.data.qr;
+                        }
                     }
                 }
             }
             
-            // Always show at least 3 slots
+            // Add demo sessions to waiting list
+            const demoWaiting = demoSessions.filter(s => s.status === 'WAITING_QR');
+            waitingSessions = [...waitingSessions, ...demoWaiting];
+            allSessions = [...allSessions, ...demoSessions];
+            
+            // Always show at least 4 slots (even on API error)
             let html = '';
-            for (let i = 0; i < Math.max(3, waitingSessions.length); i++) {
+            const totalSlots = Math.max(4, waitingSessions.length + 1);
+            for (let i = 0; i < totalSlots; i++) {
                 if (waitingSessions[i]) {
                     html += renderCard(waitingSessions[i]);
                 } else {
@@ -366,8 +500,28 @@
             document.getElementById('totalCount').textContent = allSessions.length;
         }
         
-        // Initial load and auto-refresh
-        refresh();
+        // Auto-provision sessions from proxy pool
+        async function autoProvision(count = 4) {
+            const result = await api('/api/v1/dashboard/sessions');
+            const existingSessions = result?.data || [];
+            const waitingCount = existingSessions.filter(s => s.status === 'WAITING_QR').length + demoSessions.length;
+            
+            const needed = count - waitingCount;
+            console.log(`Auto-provision: ${waitingCount} existing, need ${needed} more`);
+            
+            for (let i = 0; i < needed; i++) {
+                await createSession(false); // Don't show alerts in auto mode
+                await new Promise(r => setTimeout(r, 300)); // Small delay between creates
+            }
+        }
+        
+        // Initial load - auto provision 4 sessions
+        (async () => {
+            await refresh();
+            await autoProvision(4);
+        })();
+        
+        // Auto-refresh every 5 seconds
         setInterval(refresh, 5000);
     </script>
 </body>
