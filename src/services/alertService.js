@@ -67,10 +67,20 @@ async function storeAlerts(alerts) {
   return alerts.length;
 }
 
+// Track last alert time to prevent spam
+let lastInventoryAlertTime = 0;
+const INVENTORY_ALERT_COOLDOWN_MS = 60000; // 1 minute cooldown
+
 async function alertLowInventory({ profilesAvailable, proxiesAvailable }) {
-  console.warn(
-    `[ALERT] Low inventory: profilesAvailable=${profilesAvailable}, proxiesAvailable=${proxiesAvailable}`
-  );
+  const now = Date.now();
+  
+  // Only log every 1 minute to prevent spam
+  if (now - lastInventoryAlertTime > INVENTORY_ALERT_COOLDOWN_MS) {
+    console.warn(
+      `[ALERT] Low inventory: profilesAvailable=${profilesAvailable}, proxiesAvailable=${proxiesAvailable}`
+    );
+    lastInventoryAlertTime = now;
+  }
   
   const alerts = [];
   const profilesLow = Number(config.profilesLowThreshold || 5);
