@@ -13,9 +13,10 @@ const { getSession, updateSessionStatus, SessionStatus } = require("./sessionReg
 const docker = new Docker();
 
 // Configuration
-const WORKER_IMAGE = process.env.WORKER_IMAGE || "whatsapp-worker-image:1.0.0";
-const SESSIONS_VOLUME_PATH = process.env.SESSIONS_VOLUME_PATH || "/data/wa-sessions";
-const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || "http://host.docker.internal:3000";
+// Use the worker image built by docker-compose (or custom image)
+const WORKER_IMAGE = process.env.WORKER_IMAGE || "whatsapp-orchestrator-worker-1:latest";
+const SESSIONS_VOLUME_PATH = process.env.SESSIONS_VOLUME_PATH || "/opt/whatsapp-orchestrator/sessions";
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || "http://wa_orchestrator:3000";
 const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || "http://host.docker.internal:4000";
 const MEDIA_INTERNAL_KEY = process.env.MEDIA_INTERNAL_KEY || "";
 
@@ -68,9 +69,10 @@ async function startWorker(sessionId, options = {}) {
       `MEDIA_INTERNAL_KEY=${options.mediaInternalKey || MEDIA_INTERNAL_KEY}`
     ];
     
-    // Add proxy if available
-    if (proxy && proxy !== "none") {
-      env.push(`PROXY_URL=${proxy}`);
+    // Add proxy if available (from session record or options)
+    const proxyUrl = options.proxy || proxy;
+    if (proxyUrl && proxyUrl !== "none" && proxyUrl !== "no-proxy") {
+      env.push(`PROXY_URL=${proxyUrl}`);
     }
     
     // Add optional env vars
@@ -88,6 +90,9 @@ async function startWorker(sessionId, options = {}) {
     const hostPath = `${options.sessionsPath || SESSIONS_VOLUME_PATH}/${sessionId}`;
     const containerPath = `/app/sessions/${sessionId}`;
     
+    // Docker network name (from docker-compose)
+    const DOCKER_NETWORK = process.env.DOCKER_NETWORK || "whatsapp-orchestrator_whatsapp-network";
+    
     // Create container
     const container = await docker.createContainer({
       Image: WORKER_IMAGE,
@@ -99,8 +104,8 @@ async function startWorker(sessionId, options = {}) {
           Name: options.restartPolicy || "unless-stopped",
           MaximumRetryCount: 0
         },
-        // Add extra hosts for host.docker.internal on Linux
-        ExtraHosts: ["host.docker.internal:host-gateway"]
+        // Connect to the same network as orchestrator
+        NetworkMode: DOCKER_NETWORK
       },
       Labels: {
         "wa.session.id": sessionId,
