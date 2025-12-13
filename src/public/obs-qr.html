@@ -315,12 +315,15 @@
       } catch (err) {
         console.error('Create session error:', err);
         updateStatus('error', `❌ שגיאה: ${err.message}`);
+        isCreatingSession = false;
         
-        // נסה שוב אחרי 5 שניות
-        setTimeout(() => {
-          isCreatingSession = false;
-          createNewSession();
-        }, 5000);
+        // נסה שוב אחרי 10 שניות רק אם אין סשן פעיל
+        if (!currentSessionId) {
+          setTimeout(() => {
+            createNewSession();
+          }, 10000);
+        }
+        return;
       }
       
       isCreatingSession = false;
@@ -346,21 +349,23 @@
         
         const data = await response.json();
         
-        if (data.qr) {
+        if (data.qrCode || data.qr) {
           // יש QR - הצג אותו
-          showQR(data.qr);
+          showQR(data.qrCode || data.qr);
           updateStatus('ready', '📱 סרוק את הקוד להתחברות');
         } else if (data.status === 'CONNECTED' || data.connected) {
           // מחובר!
           showConnected(data.phone || data.phoneNumber);
-        } else if (data.status === 'PENDING' || data.status === 'pending') {
+        } else if (response.status === 404) {
+          // QR עדיין לא מוכן - ממתינים (לא יוצרים סשן חדש!)
           updateStatus('waiting', '⏳ ממתין ל-QR מהשרת...');
         } else {
-          // בדוק סטטוס סשן
-          checkSessionStatus(sessionId);
+          updateStatus('waiting', '⏳ ממתין ל-QR...');
         }
       } catch (err) {
         console.error('QR check error:', err);
+        // שגיאת רשת - ממשיכים לנסות
+        updateStatus('waiting', '⏳ מחפש QR...');
       }
     }
     
