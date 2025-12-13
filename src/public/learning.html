@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 לוח למידה - WhatsApp Orchestrator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0d0d2a 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    header {
+      text-align: center;
+      padding: 20px 0 30px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 30px;
+    }
+    
+    header h1 {
+      font-size: 28px;
+      color: #00d4ff;
+      margin-bottom: 10px;
+    }
+    
+    header p {
+      color: #888;
+      font-size: 14px;
+    }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #00d4ff;
+    }
+    
+    .stat-card .label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+    
+    .stat-card.success .value { color: #00ff88; }
+    .stat-card.warning .value { color: #ffaa00; }
+    .stat-card.danger .value { color: #ff4444; }
+    
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    
+    .card h2 {
+      font-size: 16px;
+      color: #00d4ff;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* Insights */
+    .insight {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+    
+    .insight.action {
+      background: rgba(0, 255, 136, 0.1);
+      border-color: rgba(0, 255, 136, 0.3);
+    }
+    
+    .insight.warning {
+      background: rgba(255, 170, 0, 0.1);
+      border-color: rgba(255, 170, 0, 0.3);
+    }
+    
+    .insight.danger {
+      background: rgba(255, 68, 68, 0.1);
+      border-color: rgba(255, 68, 68, 0.3);
+    }
+    
+    .insight-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .insight-title {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .insight-badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .insight-body {
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+    }
+    
+    .insight-action {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .insight-action button {
+      background: linear-gradient(135deg, #00d4ff, #0088ff);
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    
+    .insight-action button:hover {
+      transform: scale(1.02);
+    }
+    
+    .insight-action button.secondary {
+      background: rgba(255,255,255,0.1);
+    }
+    
+    /* Session Learning */
+    .session-row {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      gap: 15px;
+    }
+    
+    .session-row:last-child {
+      border-bottom: none;
+    }
+    
+    .session-level {
+      width: 60px;
+      text-align: center;
+      padding: 5px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    
+    .session-level.cold { background: #334; color: #88f; }
+    .session-level.warm { background: #443; color: #fa0; }
+    .session-level.hot { background: #343; color: #0f8; }
+    
+    .session-info {
+      flex: 1;
+    }
+    
+    .session-phone {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .session-stats {
+      font-size: 11px;
+      color: #666;
+    }
+    
+    .session-progress {
+      width: 100px;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00d4ff, #00ff88);
+      transition: width 0.3s;
+    }
+    
+    .progress-label {
+      font-size: 10px;
+      color: #666;
+      margin-top: 3px;
+      text-align: center;
+    }
+    
+    /* Patterns */
+    .pattern-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .pattern-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-left: 12px;
+    }
+    
+    .pattern-icon.positive { background: rgba(0,255,136,0.2); }
+    .pattern-icon.negative { background: rgba(255,68,68,0.2); }
+    .pattern-icon.neutral { background: rgba(255,170,0,0.2); }
+    
+    .pattern-text {
+      flex: 1;
+    }
+    
+    .pattern-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .pattern-desc {
+      font-size: 11px;
+      color: #666;
+    }
+    
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-right: 20px;
+    }
+    
+    .timeline::before {
+      content: '';
+      position: absolute;
+      right: 5px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .timeline-item {
+      position: relative;
+      padding: 10px 25px 10px 0;
+    }
+    
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 15px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #00d4ff;
+      border: 2px solid #1a1a3a;
+    }
+    
+    .timeline-item.success::before { background: #00ff88; }
+    .timeline-item.warning::before { background: #ffaa00; }
+    .timeline-item.error::before { background: #ff4444; }
+    
+    .timeline-time {
+      font-size: 10px;
+      color: #666;
+    }
+    
+    .timeline-text {
+      font-size: 13px;
+      margin-top: 3px;
+    }
+    
+    /* Refresh */
+    .refresh-indicator {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.8);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .refresh-indicator.loading {
+      color: #00d4ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 לוח למידה ומסקנות</h1>
+      <p>המערכת לומדת ומציגה תובנות בזמן אמת</p>
+    </header>
+    
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="value" id="totalSessions">0</div>
+        <div class="label">סשנים פעילים</div>
+      </div>
+      <div class="stat-card success">
+        <div class="value" id="successRate">0%</div>
+        <div class="label">אחוז הצלחה</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="avgTrustLevel">-</div>
+        <div class="label">Trust Level ממוצע</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="value" id="patternsFound">0</div>
+        <div class="label">דפוסים שזוהו</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="insightsToday">0</div>
+        <div class="label">תובנות היום</div>
+      </div>
+    </div>
+    
+    <!-- Main Grid -->
+    <div class="grid-2">
+      <!-- Insights -->
+      <div class="card">
+        <h2>💡 תובנות ומסקנות</h2>
+        <div id="insights">
+          <div class="insight action">
+            <div class="insight-header">
+              <span class="insight-title">✅ הזדמנות להגדלת קיבולת</span>
+              <span class="insight-badge">חדש</span>
+            </div>
+            <div class="insight-body">
+              3 סשנים הגיעו לרמת HOT - אפשר להעלות את מגבלת ההודעות שלהם ל-200/יום
+            </div>
+            <div class="insight-action">
+              <button onclick="applyInsight('increase_limits')">החל שינוי</button>
+              <button class="secondary" onclick="dismissInsight(this)">התעלם</button>
+            </div>
+          </div>
+          
+          <div class="insight warning">
+            <div class="insight-header">
+              <span class="insight-title">⚠️ דפוס חשוד בפרוקסי</span>
+              <span class="insight-badge">לבדיקה</span>
+            </div>
+            <div class="insight-body">
+              פרוקסי 172.28.0.10 מראה זמני תגובה גבוהים ב-2 שעות האחרונות. ייתכן שנשרף.
+            </div>
+            <div class="insight-action">
+              <button onclick="applyInsight('check_proxy')">בדוק פרוקסי</button>
+              <button class="secondary" onclick="applyInsight('switch_proxy')">החלף פרוקסי</button>
+            </div>
+          </div>
+          
+          <div class="insight">
+            <div class="insight-header">
+              <span class="insight-title">📈 שעות פעילות אופטימליות</span>
+              <span class="insight-badge">למידה</span>
+            </div>
+            <div class="insight-body">
+              המערכת זיהתה שאחוז ההצלחה הגבוה ביותר הוא בין 10:00-14:00 ו-18:00-21:00
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Session Learning -->
+      <div class="card">
+        <h2>📱 התקדמות סשנים</h2>
+        <div id="sessionLearning">
+          <div class="session-row">
+            <div class="session-level hot">HOT</div>
+            <div class="session-info">
+              <div class="session-phone">972-50-123-4567</div>
+              <div class="session-stats">12 ימים | 847 הודעות | 98% הצלחה</div>
+            </div>
+            <div class="session-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 100%"></div>
+              </div>
+              <div class="progress-label">מקסימום</div>
+            </div>
+          </div>
+          
+          <div class="session-row">
+            <div class="session-level warm">WARM</div>
+            <div class="session-info">
+              <div class="session-phone">972-52-987-6543</div>
+              <div class="session-stats">5 ימים | 156 הודעות | 95% הצלחה</div>
+            </div>
+            <div class="session-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 65%"></div>
+              </div>
+              <div class="progress-label">עוד 2 ימים</div>
+            </div>
+          </div>
+          
+          <div class="session-row">
+            <div class="session-level cold">COLD</div>
+            <div class="session-info">
+              <div class="session-phone">972-54-111-2222</div>
+              <div class="session-stats">1 יום | 8 הודעות | 100% הצלחה</div>
+            </div>
+            <div class="session-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 20%"></div>
+              </div>
+              <div class="progress-label">עוד 6 ימים</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Second Row -->
+    <div class="grid-2">
+      <!-- Patterns -->
+      <div class="card">
+        <h2>🔍 דפוסים שזוהו</h2>
+        <div id="patterns">
+          <div class="pattern-item">
+            <div class="pattern-icon positive">📈</div>
+            <div class="pattern-text">
+              <div class="pattern-title">הודעות קצרות מצליחות יותר</div>
+              <div class="pattern-desc">הודעות עד 100 תווים: 97% הצלחה | מעל 300: 89%</div>
+            </div>
+          </div>
+          
+          <div class="pattern-item">
+            <div class="pattern-icon positive">⏰</div>
+            <div class="pattern-text">
+              <div class="pattern-title">שעות בוקר = פחות באנים</div>
+              <div class="pattern-desc">08:00-12:00 הכי בטוח | 23:00-06:00 מסוכן</div>
+            </div>
+          </div>
+          
+          <div class="pattern-item">
+            <div class="pattern-icon negative">🚫</div>
+            <div class="pattern-text">
+              <div class="pattern-title">לינקים מעלים סיכון</div>
+              <div class="pattern-desc">הודעות עם לינקים: 15% יותר באנים</div>
+            </div>
+          </div>
+          
+          <div class="pattern-item">
+            <div class="pattern-icon neutral">🔄</div>
+            <div class="pattern-text">
+              <div class="pattern-title">Jitter אופטימלי: 25-35%</div>
+              <div class="pattern-desc">שונות בזמנים מורידה זיהוי אוטומציה</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Timeline -->
+      <div class="card">
+        <h2>📅 היסטוריית למידה</h2>
+        <div class="timeline" id="timeline">
+          <div class="timeline-item success">
+            <div class="timeline-time">היום 14:32</div>
+            <div class="timeline-text">סשן 972-50-XXX עבר ל-HOT אחרי 7 ימים</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-time">היום 11:15</div>
+            <div class="timeline-text">זוהה דפוס חדש: הודעות עם אימוג'י מצליחות יותר</div>
+          </div>
+          <div class="timeline-item warning">
+            <div class="timeline-time">אתמול 22:45</div>
+            <div class="timeline-text">פרוקסי #3 סומן לבדיקה (זמני תגובה גבוהים)</div>
+          </div>
+          <div class="timeline-item success">
+            <div class="timeline-time">אתמול 16:20</div>
+            <div class="timeline-text">המערכת למדה: Delay אופטימלי = 2.5-4 שניות</div>
+          </div>
+          <div class="timeline-item error">
+            <div class="timeline-time">לפני יומיים</div>
+            <div class="timeline-text">סשן 972-54-XXX נחסם - נלמד: לא לשלוח לינקים בימים ראשונים</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Recommendations -->
+    <div class="card" style="margin-top: 20px;">
+      <h2>🎯 המלצות ליישום מיידי</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+        <div class="insight action">
+          <div class="insight-header">
+            <span class="insight-title">1. העלה Jitter ל-30%</span>
+          </div>
+          <div class="insight-body">בהתבסס על 1,247 הודעות - jitter גבוה יותר מוריד סיכון</div>
+          <div class="insight-action">
+            <button onclick="applyRecommendation('jitter', 30)">החל</button>
+          </div>
+        </div>
+        
+        <div class="insight action">
+          <div class="insight-header">
+            <span class="insight-title">2. הגבל שליחה בלילה</span>
+          </div>
+          <div class="insight-body">23:00-07:00 = סיכון גבוה. המלצה: להפחית ל-5 הודעות/שעה</div>
+          <div class="insight-action">
+            <button onclick="applyRecommendation('night_limit', 5)">החל</button>
+          </div>
+        </div>
+        
+        <div class="insight action">
+          <div class="insight-header">
+            <span class="insight-title">3. הוסף פרוקסי נוסף</span>
+          </div>
+          <div class="insight-body">3 פרוקסים עם 4 סשנים כל אחד. המלצה: להוסיף רזרבה</div>
+          <div class="insight-action">
+            <button onclick="window.location.href='/anti-ban'">הגדרות</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="refresh-indicator" id="refreshIndicator">
+    מתעדכן כל 30 שניות
+  </div>
+  
+  <script>
+    const API_KEY = localStorage.getItem('API_KEY') || 'change-me';
+    
+    // Load data
+    function heatColor(n, max) {
+      if (max <= 0) return 'rgba(255,255,255,0.04)';
+      const t = Math.min(1, n / max);
+      const r = Math.round(255 * t);
+      const g = Math.round(68 * (1 - t) + 170 * (1 - t)); // keep muted
+      const b = Math.round(68 * (1 - t) + 0 * t);
+      return `rgba(${r},${g},${b},0.25)`;
+    }
+
+    async function loadData() {
+      const indicator = document.getElementById('refreshIndicator');
+      indicator.classList.add('loading');
+      indicator.textContent = 'טוען...';
+      
+      try {
+        const [dashRes, insightsRes, sbBlocksRes, sbDecisionsRes] = await Promise.all([
+          fetch('/api/v1/dashboard/full', { headers: { 'X-API-KEY': API_KEY } }),
+          fetch('/api/anti-ban/insights?days=7', { headers: { 'X-API-KEY': API_KEY } }),
+          fetch('/api/anti-ban/session-brain/blocks', { headers: { 'X-API-KEY': API_KEY } }),
+          fetch('/api/anti-ban/session-brain/decisions?limit=100', { headers: { 'X-API-KEY': API_KEY } }),
+        ]);
+
+        if (dashRes.ok) {
+          const dash = await dashRes.json();
+          updateStats(dash.data || dash);
+          updateSessions((dash.data?.sessions) || dash.sessions || []);
+        }
+
+        if (insightsRes.ok) {
+          const insights = await insightsRes.json();
+          updateInsights(insights);
+        }
+
+        if (sbBlocksRes.ok && sbDecisionsRes.ok) {
+          const blocks = await sbBlocksRes.json();
+          const decisions = await sbDecisionsRes.json();
+          updateSessionBrain(blocks.data || {}, decisions.data || {});
+        }
+      } catch (e) {
+        console.error('Load error:', e);
+      }
+      
+      indicator.classList.remove('loading');
+      indicator.textContent = 'מתעדכן כל 30 שניות';
+    }
+    
+    function updateStats(data) {
+      const stats = data.stats || data?.data?.stats || {};
+      document.getElementById('totalSessions').textContent = stats.connected || 0;
+      
+      // Calculate success rate
+      const sent = stats.messagesSent || 0;
+      const failed = stats.messagesFailed || 0;
+      const total = sent + failed;
+      const rate = total > 0 ? Math.round((sent / total) * 100) : 100;
+      document.getElementById('successRate').textContent = rate + '%';
+    }
+    
+    function updateSessions(sessions) {
+      const container = document.getElementById('sessionLearning');
+      if (sessions.length === 0) return;
+      
+      // Group by trust level
+      const hot = sessions.filter(s => s.trustLevel === 'HOT' || (s.ageInDays || 0) >= 7);
+      const warm = sessions.filter(s => s.trustLevel === 'WARM' || ((s.ageInDays || 0) >= 3 && (s.ageInDays || 0) < 7));
+      const cold = sessions.filter(s => !s.trustLevel || s.trustLevel === 'COLD' || (s.ageInDays || 0) < 3);
+      
+      // Update avg trust level
+      let avgLevel = 'COLD';
+      if (hot.length > warm.length && hot.length > cold.length) avgLevel = 'HOT';
+      else if (warm.length > cold.length) avgLevel = 'WARM';
+      document.getElementById('avgTrustLevel').textContent = avgLevel;
+    }
+
+    function updateInsights(ins) {
+      // Top counters
+      const total = ins?.totals?.incidents ?? 0;
+      document.getElementById('patternsFound').textContent = Object.keys(ins.byType || {}).length;
+
+      // "תובנות היום" = incidents in last 24h
+      const since = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = (ins.recent || []).filter(x => (x.ts || 0) >= since);
+      document.getElementById('insightsToday').textContent = recent.length;
+
+      // Render insights cards
+      const byType = ins.byType || {};
+      const sortedTypes = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      const topSessions = (ins.topSessions || []).slice(0,5);
+      const topProxies = (ins.topProxies || []).slice(0,5);
+
+      const insightsEl = document.getElementById('insights');
+      insightsEl.innerHTML = [
+        `<div class="insight">
+          <div class="insight-header">
+            <span class="insight-title">📌 סיכום 7 ימים</span>
+            <span class="insight-badge">incidents: ${total}</span>
+          </div>
+          <div class="insight-body">הדף מציג חסימות/תקלות לפי שעה, סוג, סשן ופרוקסי (מתוך antiban:incidents).</div>
+        </div>`,
+        `<div class="insight warning">
+          <div class="insight-header">
+            <span class="insight-title">⏰ שעות עם הכי הרבה אירועים</span>
+            <span class="insight-badge">heatmap</span>
+          </div>
+          <div class="insight-body" id="hourHeat"></div>
+        </div>`,
+        `<div class="insight action">
+          <div class="insight-header">
+            <span class="insight-title">🔝 סוגי אירועים מובילים</span>
+            <span class="insight-badge">top 5</span>
+          </div>
+          <div class="insight-body">${sortedTypes.map(([t,c])=>`${t}: ${c}`).join('<br/>') || '—'}</div>
+        </div>`,
+        `<div class="insight warning">
+          <div class="insight-header">
+            <span class="insight-title">📱 סשנים “בעייתיים”</span>
+            <span class="insight-badge">top 5</span>
+          </div>
+          <div class="insight-body">${topSessions.map(x=>`${x.sessionId}: ${x.count}`).join('<br/>') || '—'}</div>
+        </div>`,
+        `<div class="insight warning">
+          <div class="insight-header">
+            <span class="insight-title">🌐 פרוקסים “בעייתיים”</span>
+            <span class="insight-badge">top 5</span>
+          </div>
+          <div class="insight-body">${topProxies.map(x=>`${String(x.proxyId).slice(-12)}: ${x.count}`).join('<br/>') || '—'}</div>
+        </div>`
+      ].join('');
+
+      // Heatmap 24h
+      const byHour = ins.byHour || Array.from({length:24}, ()=>0);
+      const max = Math.max(...byHour, 0);
+      const heat = byHour.map((v,h)=>`<span style="display:inline-block; min-width:44px; margin:4px; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:${heatColor(v,max)}" class="mono">${String(h).padStart(2,'0')}: ${v}</span>`).join('');
+      const hourEl = document.getElementById('hourHeat');
+      if (hourEl) hourEl.innerHTML = heat;
+
+      // Timeline from recent incidents
+      const timeline = document.getElementById('timeline');
+      if (timeline) {
+        const items = (ins.recent || []).slice(0, 12);
+        timeline.innerHTML = items.map(it => {
+          const t = it.ts ? new Date(it.ts).toLocaleString('he-IL') : '—';
+          const type = it.type || '—';
+          const sid = it.sessionId ? ` session=${it.sessionId}` : '';
+          const pid = it.proxyId ? ` proxy=${String(it.proxyId).slice(-12)}` : '';
+          const reason = it.reason ? ` (${it.reason})` : '';
+          const cls = (type.includes('BANN') || type.includes('LOGGED_OUT')) ? 'error' : (type.includes('PROXY') ? 'warning' : 'success');
+          return `<div class="timeline-item ${cls}">
+            <div class="timeline-time">${t}</div>
+            <div class="timeline-text">${type}${reason}${sid}${pid}</div>
+          </div>`;
+        }).join('') || `<div class="timeline-item"><div class="timeline-text">אין אירועים</div></div>`;
+      }
+    }
+
+    function updateSessionBrain(blocks, decisions) {
+      // Extend the "Insights" section with Session Brain view
+      const active = blocks.active_blocks || {};
+      const activeCount = Object.keys(active).length;
+      const decs = decisions.decisions || [];
+
+      const insightsEl = document.getElementById('insights');
+      const extra = document.createElement('div');
+      extra.innerHTML = `
+        <div class="insight danger">
+          <div class="insight-header">
+            <span class="insight-title">🧠 Session Brain - חסימות פעילות</span>
+            <span class="insight-badge">active: ${activeCount}</span>
+          </div>
+          <div class="insight-body">
+            ${activeCount === 0 ? 'אין חסימות פעילות כרגע' : Object.entries(active).slice(0,10).map(([ip, exp]) => {
+              const t = new Date(exp).toLocaleString('he-IL');
+              return `IP/Proxy: <b>${String(ip).slice(-14)}</b> עד ${t}`;
+            }).join('<br/>')}
+          </div>
+        </div>
+        <div class="insight warning">
+          <div class="insight-header">
+            <span class="insight-title">🧠 Session Brain - החלטות אחרונות</span>
+            <span class="insight-badge">last: ${Math.min(10, decs.length)}</span>
+          </div>
+          <div class="insight-body">
+            ${decs.slice(0,10).map(d => {
+              const t = d.ts_ms ? new Date(d.ts_ms).toLocaleString('he-IL') : '—';
+              return `${t} | ${d.kind} | target=${String(d.target).slice(-14)} | ttl=${d.ttl_sec}s | ${d.reason}`;
+            }).join('<br/>') || '—'}
+          </div>
+        </div>
+      `;
+
+      // Replace any old appended SB blocks (simple idempotency by removing existing)
+      const old = document.getElementById('sbMount');
+      if (old) old.remove();
+      extra.id = 'sbMount';
+      insightsEl.appendChild(extra);
+    }
+    
+    function applyInsight(action) {
+      alert(`מחיל פעולה: ${action}\n\nזה יבוצע דרך ה-API`);
+    }
+    
+    function dismissInsight(btn) {
+      btn.closest('.insight').style.display = 'none';
+    }
+    
+    function applyRecommendation(type, value) {
+      alert(`מחיל המלצה: ${type} = ${value}\n\nזה יבוצע דרך ה-API`);
+    }
+    
+    // Ask AI a question
+    async function askAI() {
+      const question = prompt("שאל את ה-AI על חסימות WhatsApp:");
+      if (!question) return;
+      
+      try {
+        const response = await fetch('/api/v1/ai/ask', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': API_KEY
+          },
+          body: JSON.stringify({ question })
+        });
+        
+        const data = await response.json();
+        if (data.answer) {
+          alert(`🤖 תשובת AI:\n\n${data.answer}`);
+        } else {
+          alert(`שגיאה: ${data.error || 'לא ידוע'}`);
+        }
+      } catch (e) {
+        alert('שגיאה בתקשורת עם AI');
+      }
+    }
+    
+    // Load AI insights
+    async function loadAIInsights() {
+      try {
+        const response = await fetch('/api/v1/ai/insights?limit=5', {
+          headers: { 'X-API-KEY': API_KEY }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('AI Insights:', data);
+        }
+      } catch (e) {
+        console.error('Error loading AI insights:', e);
+      }
+    }
+    
+    // Load daily recommendations
+    async function loadDailyRecommendations() {
+      try {
+        const response = await fetch('/api/v1/ai/daily-improvement', {
+          headers: { 'X-API-KEY': API_KEY }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.recommendations) {
+            console.log('Daily Recommendations:', data.recommendations);
+          }
+        }
+      } catch (e) {
+        console.error('Error loading recommendations:', e);
+      }
+    }
+    
+    // Initial load
+    loadData();
+    loadAIInsights();
+    loadDailyRecommendations();
+    
+    // Refresh every 30 seconds
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>
+

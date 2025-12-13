@@ -1,0 +1,65 @@
+כדי לוודא שה“זהויות” של ה־Docker Worker חזקות מבחינת Anti‑Ban, תבקש ממנו **הוכחות מדידות** (לא “כן עשיתי”). הנה רשימת שאלות/דרישות להדבקה אליו:
+
+---
+
+### 1) Fingerprint / Browser Identity (חובה)
+- **מה בדיוק אתה מגדיר ב־Baileys כ־`browser`?** שלח צילום/פלט של הערכים בפועל: `BROWSER_OS/BROWSER_NAME/BROWSER_VERSION`.
+- **האם יש שונות (diversity) בין workers?**  
+  - האם יש generator שמחליף OS/Version בצורה מבוקרת?
+  - או שכל הקונטיינרים יוצאים עם אותו fingerprint?
+- **האם אתה משדר User-Agent אמיתי/סביר?** אם כן—איפה מוגדר? (אם לא, תגיד במפורש “לא מטופל”).
+
+---
+
+### 2) Proxy Enforcement (קריטי)
+- **תוכיח שהחיבור באמת יוצא דרך הפרוקסי**:  
+  - תן פלט בדיקה מתוך הקונטיינר שמראה IP חיצוני (למשל קריאה ל־`https://api.ipify.org` דרך אותו agent / או כלי network) + צילום.
+- **מה קורה כשהפרוקסי נופל?**  
+  - האם אתה מזהה timeout/515 ומדווח `STATUS_CHANGE/PROXY_ERROR`?
+  - האם יש backoff כדי למנוע reconnect storm?
+
+---
+
+### 3) Session Isolation (קריטי)
+- **תוכיח שאין שיתוף state בין קונטיינרים**:  
+  - שני SESSION_ID שונים עם volumes שונים → האם נוצרות תיקיות נפרדות תחת `/app/sessions/<id>`?
+  - שלח `docker run` ששימש אותך + צילום של מבנה התיקיות ב־host.
+- **מה קורה אם מריצים שני קונטיינרים עם אותו SESSION_ID בטעות?**  
+  - האם יש מנגנון מניעה/אזהרה? (מינימום: log ברור + exit).
+
+---
+
+### 4) QR/Connection Flow (אמינות)
+- **איך אתה מספק QR?** webhook/terminal/שניהם?  
+  - שלח דוגמה של payload `QR_UPDATE` אמיתי.
+- **האם `qrTimeout: 0` נשמר?** שלח snippet/שורה מהקוד.
+
+---
+
+### 5) Rate/Behavior Controls (לא Business, אבל Anti‑Ban בסיסי)
+- **האם קיימים delays/jitter לפני שליחה/פעולות?**  
+  - אם כן: תן טווחים מדויקים (ms) ואיפה זה בקוד.
+  - אם לא: שיגיד “לא קיים” (כדי שנדע שזה אצל anti‑ban programmer/orchestrator).
+- **האם יש הגבלת reconnects** (max retries / backoff)? תן ערכים.
+
+---
+
+### 6) Telemetry שמאפשרת Anti‑Ban
+תבקש ממנו להוסיף/להציג בלוגים מובנים (או webhook events) שמכילים:
+- `sessionId`, `proxy`, `browserFingerprint`, `eventType`, `timestamp`
+כדי שנוכל לזהות דפוסים חשודים.
+
+---
+
+### 7) “הוכחת חוסן” (Acceptance Evidence)
+תבקש ממנו לשלוח:
+- 10 דקות ריצה עם Ping כל דקה (הוכחה)
+- restart של הקונטיינר בלי QR מחדש (הוכחה)
+- ריצה עם פרוקסי + בדיקת IP חיצוני (הוכחה)
+
+---
+
+### משפט אחד קצר להדבקה אליו
+“תן לי הוכחה שה־Worker שלך יוצר **זהות עקבית אך לא זהה** בין סשנים (browser/fingerprint), שה־proxy **באמת נאכף** (IP proof), ושיש **isolation מלא** של auth per SESSION_ID. שלח outputs/logs/commands—not explanations.”
+
+אם תגיד לי האם “הוא שולח הודעה” זה אומר *שולח הודעת WhatsApp בפועל* או *שולח webhook*, אני אדייק את השאלות כדי לפגוע בדיוק בנקודות הסיכון של באן.

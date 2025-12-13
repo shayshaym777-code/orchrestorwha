@@ -1,0 +1,204 @@
+version: '3.8'
+
+# =====================================================
+# WhatsApp Orchestrator - Production Docker Compose
+# Architecture: Fixed IPs for each container
+# =====================================================
+
+networks:
+  whatsapp-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+
+volumes:
+  redis_data:
+  sessions_data:
+  backups_data:
+
+services:
+  # =====================================================
+  # Redis - Data Store
+  # IP: 172.28.0.2
+  # =====================================================
+  redis:
+    image: redis:7-alpine
+    container_name: wa_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.2
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =====================================================
+  # Orchestrator - Main Control Server
+  # IP: 172.28.0.3
+  # =====================================================
+  orchestrator:
+    build: .
+    container_name: wa_orchestrator
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://172.28.0.2:6379
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - API_KEY=${API_KEY:-change-me-api-key}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - SESSIONS_DIR=/app/sessions
+      - BACKUPS_DIR=/app/backups
+      - MAX_BACKUPS=7
+    volumes:
+      - sessions_data:/app/sessions
+      - backups_data:/app/backups
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.3
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =====================================================
+  # Worker 1 - WhatsApp Session
+  # IP: 172.28.0.10
+  # =====================================================
+  worker-1:
+    build: ./docker-wa-worker
+    container_name: wa_worker_1
+    restart: unless-stopped
+    environment:
+      - SESSION_ID=worker_1
+      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - PROXY_URL=${PROXY_URL_1}
+      - ENABLE_KEEP_ALIVE=true
+      - PRESENCE_INTERVAL_MS=15000
+      - HIDDEN_MSG_INTERVAL_MS=600000
+    volumes:
+      - sessions_data:/app/sessions
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.10
+    depends_on:
+      - orchestrator
+
+  # =====================================================
+  # Worker 2 - WhatsApp Session
+  # IP: 172.28.0.11
+  # =====================================================
+  worker-2:
+    build: ./docker-wa-worker
+    container_name: wa_worker_2
+    restart: unless-stopped
+    environment:
+      - SESSION_ID=worker_2
+      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - PROXY_URL=${PROXY_URL_2}
+      - ENABLE_KEEP_ALIVE=true
+      - PRESENCE_INTERVAL_MS=15000
+      - HIDDEN_MSG_INTERVAL_MS=600000
+    volumes:
+      - sessions_data:/app/sessions
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.11
+    depends_on:
+      - orchestrator
+
+  # =====================================================
+  # Worker 3 - WhatsApp Session
+  # IP: 172.28.0.12
+  # =====================================================
+  worker-3:
+    build: ./docker-wa-worker
+    container_name: wa_worker_3
+    restart: unless-stopped
+    environment:
+      - SESSION_ID=worker_3
+      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - PROXY_URL=${PROXY_URL_3}
+      - ENABLE_KEEP_ALIVE=true
+      - PRESENCE_INTERVAL_MS=15000
+      - HIDDEN_MSG_INTERVAL_MS=600000
+    volumes:
+      - sessions_data:/app/sessions
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.12
+    depends_on:
+      - orchestrator
+
+  # =====================================================
+  # Worker 4 - WhatsApp Session
+  # IP: 172.28.0.13
+  # =====================================================
+  worker-4:
+    build: ./docker-wa-worker
+    container_name: wa_worker_4
+    restart: unless-stopped
+    environment:
+      - SESSION_ID=worker_4
+      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - PROXY_URL=${PROXY_URL_4}
+      - ENABLE_KEEP_ALIVE=true
+      - PRESENCE_INTERVAL_MS=15000
+      - HIDDEN_MSG_INTERVAL_MS=600000
+    volumes:
+      - sessions_data:/app/sessions
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.13
+    depends_on:
+      - orchestrator
+    profiles:
+      - extended
+
+  # =====================================================
+  # Worker 5 - WhatsApp Session
+  # IP: 172.28.0.14
+  # =====================================================
+  worker-5:
+    build: ./docker-wa-worker
+    container_name: wa_worker_5
+    restart: unless-stopped
+    environment:
+      - SESSION_ID=worker_5
+      - WEBHOOK_URL=http://172.28.0.3:3000/api/webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - PROXY_URL=${PROXY_URL_5}
+      - ENABLE_KEEP_ALIVE=true
+      - PRESENCE_INTERVAL_MS=15000
+      - HIDDEN_MSG_INTERVAL_MS=600000
+    volumes:
+      - sessions_data:/app/sessions
+    networks:
+      whatsapp-network:
+        ipv4_address: 172.28.0.14
+    depends_on:
+      - orchestrator
+    profiles:
+      - extended
+

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Live Log - הודעות בזמן אמת</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: #111;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #ff0000;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+        
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+        }
+        
+        .stat-value.green { color: #00ff88; }
+        .stat-value.yellow { color: #ffaa00; }
+        .stat-value.red { color: #ff4444; }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .api-input {
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            width: 150px;
+            font-size: 12px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .btn-primary {
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        .btn-danger {
+            background: #ff4444;
+            color: #fff;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+        }
+        
+        .log-container {
+            padding-top: 70px;
+            padding-bottom: 20px;
+        }
+        
+        .log-entry {
+            display: flex;
+            padding: 8px 20px;
+            border-bottom: 1px solid #1a1a1a;
+            transition: background 0.3s;
+        }
+        
+        .log-entry:hover {
+            background: #1a1a1a;
+        }
+        
+        .log-entry.new {
+            animation: highlight 2s ease-out;
+        }
+        
+        @keyframes highlight {
+            0% { background: rgba(0, 212, 255, 0.3); }
+            100% { background: transparent; }
+        }
+        
+        .log-entry.success { border-left: 3px solid #00ff88; }
+        .log-entry.error { border-left: 3px solid #ff4444; }
+        .log-entry.warning { border-left: 3px solid #ffaa00; }
+        .log-entry.info { border-left: 3px solid #00d4ff; }
+        .log-entry.ping { border-left: 3px solid #444; }
+        
+        .log-time {
+            color: #666;
+            min-width: 90px;
+            font-size: 12px;
+        }
+        
+        .log-type {
+            min-width: 120px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .log-type.CONNECTED { color: #00ff88; }
+        .log-type.QR_UPDATE { color: #00d4ff; }
+        .log-type.PING { color: #666; }
+        .log-type.MESSAGE_SENT { color: #00ff88; }
+        .log-type.MESSAGE_FAILED { color: #ff4444; }
+        .log-type.MESSAGE_NOT_FOUND { color: #ffaa00; }
+        .log-type.STATUS_CHANGE { color: #ffaa00; }
+        .log-type.ERROR { color: #ff4444; }
+        
+        .log-session {
+            min-width: 150px;
+            color: #00d4ff;
+            font-size: 12px;
+        }
+        
+        .log-phone {
+            min-width: 130px;
+            color: #00ff88;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        
+        .log-message {
+            flex: 1;
+            color: #ccc;
+            font-size: 12px;
+        }
+        
+        .log-icon {
+            min-width: 30px;
+            font-size: 16px;
+        }
+        
+        /* Filter bar */
+        .filter-bar {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            background: #151515;
+            padding: 8px 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-bottom: 1px solid #222;
+            z-index: 99;
+        }
+        
+        .filter-btn {
+            padding: 4px 10px;
+            border: 1px solid #333;
+            background: transparent;
+            color: #888;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        
+        .filter-btn.active {
+            background: #00d4ff;
+            color: #000;
+            border-color: #00d4ff;
+        }
+        
+        .filter-btn:hover:not(.active) {
+            border-color: #666;
+            color: #fff;
+        }
+        
+        .log-container.with-filter {
+            padding-top: 110px;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 100px 20px;
+            color: #666;
+        }
+        
+        .empty-state h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        /* Scroll to bottom button */
+        .scroll-bottom {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: none;
+            z-index: 100;
+        }
+        
+        .scroll-bottom.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <div class="live-dot"></div>
+            📱 WhatsApp Live Log
+        </h1>
+        <div class="stats-bar">
+            <div class="stat">
+                <span>נשלחו:</span>
+                <span class="stat-value green" id="sentCount">0</span>
+            </div>
+            <div class="stat">
+                <span>נכשלו:</span>
+                <span class="stat-value red" id="failedCount">0</span>
+            </div>
+            <div class="stat">
+                <span>מחובר:</span>
+                <span class="stat-value green" id="connectedCount">0</span>
+            </div>
+            <div class="stat">
+                <span>אירועים:</span>
+                <span class="stat-value" id="totalEvents">0</span>
+            </div>
+        </div>
+        <div class="controls">
+            <input type="password" id="apiKey" class="api-input" placeholder="API Key" value="change-me">
+            <button class="btn btn-primary" onclick="refresh()">🔄 רענן</button>
+            <button class="btn btn-danger" onclick="clearLogs()">🗑️ נקה</button>
+        </div>
+    </div>
+    
+    <div class="filter-bar">
+        <span style="color: #666; font-size: 12px;">סנן:</span>
+        <button class="filter-btn active" data-filter="all">הכל</button>
+        <button class="filter-btn" data-filter="MESSAGE_SENT">✅ נשלח</button>
+        <button class="filter-btn" data-filter="MESSAGE_FAILED">❌ נכשל</button>
+        <button class="filter-btn" data-filter="CONNECTED">🟢 מחובר</button>
+        <button class="filter-btn" data-filter="QR_UPDATE">📱 QR</button>
+        <button class="filter-btn" data-filter="ERROR">⚠️ שגיאות</button>
+        <button class="filter-btn" data-filter="PING">💓 Ping</button>
+    </div>
+    
+    <div class="log-container with-filter" id="logContainer">
+        <div class="empty-state">
+            <h2>⏳ מחכה לאירועים...</h2>
+            <p>האירועים יופיעו כאן בזמן אמת כאשר Workers ידווחו</p>
+        </div>
+    </div>
+    
+    <button class="scroll-bottom" id="scrollBottom" onclick="scrollToBottom()">⬇</button>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        let allEvents = [];
+        let currentFilter = 'all';
+        let autoScroll = true;
+        let refreshInterval = null;
+        
+        const stats = {
+            sent: 0,
+            failed: 0,
+            connected: 0,
+            total: 0
+        };
+        
+        function getApiKey() {
+            return document.getElementById('apiKey').value;
+        }
+        
+        async function fetchApi(endpoint) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (err) {
+                console.error(`API Error: ${endpoint}`, err);
+                return null;
+            }
+        }
+        
+        async function loadEvents() {
+            // Get all sessions
+            const sessionsData = await fetchApi('/api/dashboard/sessions');
+            if (!sessionsData || !sessionsData.sessions) return;
+            
+            const newEvents = [];
+            
+            // Get events from each session
+            for (const session of sessionsData.sessions) {
+                const eventsData = await fetchApi(`/api/sessions/${session.sessionId}/events?limit=50`);
+                if (eventsData && eventsData.events) {
+                    eventsData.events.forEach(e => {
+                        // Create unique ID
+                        const eventId = `${session.sessionId}-${e.timestamp}-${e.type}`;
+                        if (!allEvents.find(x => x.id === eventId)) {
+                            newEvents.push({
+                                id: eventId,
+                                sessionId: session.sessionId,
+                                phone: session.phone || session.sessionId,
+                                type: e.type,
+                                timestamp: e.timestamp,
+                                data: e.data,
+                                isNew: true
+                            });
+                        }
+                    });
+                }
+            }
+            
+            // Add new events
+            if (newEvents.length > 0) {
+                allEvents = [...allEvents, ...newEvents];
+                allEvents.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // Update stats
+                newEvents.forEach(e => {
+                    stats.total++;
+                    if (e.type === 'MESSAGE_SENT' || e.type === 'SENT') stats.sent++;
+                    if (e.type === 'MESSAGE_FAILED' || e.type === 'FAILED' || e.type === 'ERROR') stats.failed++;
+                    if (e.type === 'CONNECTED') stats.connected++;
+                });
+                
+                updateStats();
+                renderLogs();
+            }
+        }
+        
+        function updateStats() {
+            document.getElementById('sentCount').textContent = stats.sent;
+            document.getElementById('failedCount').textContent = stats.failed;
+            document.getElementById('connectedCount').textContent = stats.connected;
+            document.getElementById('totalEvents').textContent = stats.total;
+        }
+        
+        function renderLogs() {
+            const container = document.getElementById('logContainer');
+            
+            // Filter events
+            let filtered = currentFilter === 'all' 
+                ? allEvents 
+                : allEvents.filter(e => e.type === currentFilter || e.type.includes(currentFilter));
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>⏳ מחכה לאירועים...</h2>
+                        <p>האירועים יופיעו כאן בזמן אמת</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filtered.slice(0, 200).map(e => {
+                const time = new Date(e.timestamp).toLocaleTimeString('he-IL');
+                const icon = getIcon(e.type);
+                const logClass = getLogClass(e.type);
+                const message = formatMessage(e);
+                const newClass = e.isNew ? 'new' : '';
+                
+                return `
+                    <div class="log-entry ${logClass} ${newClass}">
+                        <span class="log-icon">${icon}</span>
+                        <span class="log-time">${time}</span>
+                        <span class="log-type ${e.type}">${e.type}</span>
+                        <span class="log-phone">${e.phone}</span>
+                        <span class="log-message">${message}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            // Remove new class after animation
+            setTimeout(() => {
+                allEvents.forEach(e => e.isNew = false);
+            }, 2000);
+            
+            // Auto scroll
+            if (autoScroll) {
+                scrollToBottom();
+            }
+        }
+        
+        function getIcon(type) {
+            switch(type) {
+                case 'CONNECTED': return '🟢';
+                case 'QR_UPDATE': return '📱';
+                case 'PING': return '💓';
+                case 'MESSAGE_SENT':
+                case 'SENT': return '✅';
+                case 'MESSAGE_FAILED':
+                case 'FAILED': return '❌';
+                case 'MESSAGE_NOT_FOUND': return '⚠️';
+                case 'STATUS_CHANGE': return '🔄';
+                case 'ERROR': return '🔴';
+                default: return '📝';
+            }
+        }
+        
+        function getLogClass(type) {
+            switch(type) {
+                case 'CONNECTED':
+                case 'MESSAGE_SENT':
+                case 'SENT': return 'success';
+                case 'MESSAGE_FAILED':
+                case 'FAILED':
+                case 'ERROR': return 'error';
+                case 'MESSAGE_NOT_FOUND':
+                case 'STATUS_CHANGE': return 'warning';
+                case 'QR_UPDATE': return 'info';
+                case 'PING': return 'ping';
+                default: return 'info';
+            }
+        }
+        
+        function formatMessage(event) {
+            const data = event.data || {};
+            
+            switch(event.type) {
+                case 'CONNECTED':
+                    return `✓ התחבר בהצלחה`;
+                case 'QR_UPDATE':
+                    return `QR Code עודכן - סרוק עם הטלפון`;
+                case 'PING':
+                    return `Uptime: ${Math.floor((data.uptime || 0) / 1000)}s | Messages: ${data.messageCount || 0}`;
+                case 'STATUS_CHANGE':
+                    return `סטטוס: ${data.status || 'unknown'}`;
+                case 'MESSAGE_SENT':
+                case 'SENT':
+                    return `נשלח ל: ${data.to || data.recipient || '?'} ${data.message ? '- ' + data.message.slice(0, 30) + '...' : ''}`;
+                case 'MESSAGE_FAILED':
+                case 'FAILED':
+                    return `נכשל: ${data.error || data.reason || 'unknown error'} ${data.to ? '(ל-' + data.to + ')' : ''}`;
+                case 'MESSAGE_NOT_FOUND':
+                    return `מספר לא קיים: ${data.number || data.to || '?'}`;
+                case 'ERROR':
+                    return `שגיאה: ${data.error || data.message || 'unknown'}`;
+                default:
+                    return JSON.stringify(data).slice(0, 80);
+            }
+        }
+        
+        function scrollToBottom() {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        function clearLogs() {
+            allEvents = [];
+            stats.sent = 0;
+            stats.failed = 0;
+            stats.connected = 0;
+            stats.total = 0;
+            updateStats();
+            renderLogs();
+        }
+        
+        async function refresh() {
+            await loadEvents();
+        }
+        
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderLogs();
+            });
+        });
+        
+        // Scroll detection
+        window.addEventListener('scroll', () => {
+            const scrollBottom = document.getElementById('scrollBottom');
+            const isAtBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100;
+            autoScroll = isAtBottom;
+            scrollBottom.classList.toggle('visible', !isAtBottom);
+        });
+        
+        // Initial load
+        loadEvents();
+        refreshInterval = setInterval(loadEvents, 3000);
+    </script>
+</body>
+</html>
+

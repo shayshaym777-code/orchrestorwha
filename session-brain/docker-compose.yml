@@ -1,0 +1,27 @@
+services:
+  session_brain:
+    image: python:3.11-slim
+    container_name: session_brain
+    working_dir: /app
+    volumes:
+      - ./session_brain_server.py:/app/session_brain_server.py:ro
+      - ./data:/data
+    environment:
+      - SB_DB_PATH=/data/session_brain.sqlite3
+      # Optional tuning:
+      # - SB_WINDOW_SEC=60
+      # - SB_BLOCK_TTL_SEC=900
+      # Optional Gemini:
+      # - GEMINI_API_KEY=YOUR_KEY
+      # - GEMINI_MODEL=gemini-2.5-flash
+      # - GEMINI_ENDPOINT=https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+    ports:
+      - "9000:9000"
+    command: >
+      sh -lc "pip -q install fastapi uvicorn requests &&
+              uvicorn session_brain_server:app --host 0.0.0.0 --port 9000"
+    restart: unless-stopped
+
+
+
+

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anti‑Ban Control (Server A)</title>
+  <style>
+    :root {
+      --bg: #050510;
+      --card: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.10);
+      --text: #eee;
+      --muted: #9aa0a6;
+      --primary: #00d4ff;
+      --ok: #00ff88;
+      --warn: #ffaa00;
+      --bad: #ff4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(135deg, #0a0a1a 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(0,0,0,0.6);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
+    }
+    .brand { display: flex; gap: 10px; align-items: center; }
+    .brand b { color: var(--primary); }
+    .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      padding: 6px 10px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn.primary { border-color: rgba(0,212,255,0.35); }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    .card {
+      grid-column: span 12;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 14px; color: var(--muted); font-weight: 600; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .kpi {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.25);
+    }
+    .kpi .label { color: var(--muted); font-size: 12px; }
+    .kpi .value { margin-top: 6px; font-size: 22px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
+    th { color: var(--muted); text-align: right; font-weight: 600; }
+    .status { font-weight: 700; }
+    .status.CONNECTED { color: var(--ok); }
+    .status.WAITING_QR { color: var(--warn); }
+    .status.RECONNECTING { color: var(--warn); }
+    .status.ERROR, .status.BANNED, .status.LOGGED_OUT { color: var(--bad); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; color: #d0d0d0; }
+    .muted { color: var(--muted); }
+    .rpmSel { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); }
+    .small { font-size: 12px; }
+    .rowActions { display: flex; gap: 8px; align-items: center; justify-content: flex-start; }
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.8);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <b>Server A</b>
+      <span class="muted">Anti‑Ban Dashboard</span>
+      <span id="ts" class="pill">—</span>
+    </div>
+    <div class="actions">
+      <span class="pill">מקור נתונים: `/api/anti-ban/status`</span>
+      <span class="pill">SmartGuard: <b id="sgEnabled">—</b></span>
+      <button class="btn" onclick="toggleSmartGuard()">SmartGuard On/Off</button>
+      <button class="btn" onclick="applyGlobalRpm(5)">5 RPM</button>
+      <button class="btn" onclick="applyGlobalRpm(10)">10 RPM</button>
+      <button class="btn" onclick="applyGlobalRpm(15)">15 RPM</button>
+      <button class="btn" onclick="applyGlobalRpm(20)">20 RPM</button>
+      <button class="btn" onclick="applyGlobalRpm(null)">(clear)</button>
+      <button class="btn" onclick="fetchAiAdvice()">AI Advice</button>
+      <button class="btn primary" onclick="refreshNow()">רענן</button>
+      <label class="pill">רענון:
+        <select id="refreshSec" class="rpmSel" onchange="updateRefresh()">
+          <option value="2">2s</option>
+          <option value="5" selected>5s</option>
+          <option value="10">10s</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h2>תמונה כללית (תורים + מהירות)</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">Gateway Queue</div>
+            <div class="value" id="kpiGateway">—</div>
+            <div class="muted small mono">gateway:jobs</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Dispatcher Running</div>
+            <div class="value" id="kpiDisp">—</div>
+            <div class="muted small mono" id="kpiDispUrl">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Connected Sessions</div>
+            <div class="value" id="kpiConn">—</div>
+            <div class="muted small">מתוך <span id="kpiTotalSess">—</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Outbox Pending (sum)</div>
+            <div class="value" id="kpiOutbox">—</div>
+            <div class="muted small">queued + processing</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>סשנים (חלוקה + שליטה במהירות)</h2>
+        <div class="muted small" style="margin-bottom:10px;">
+          - <b>routedLast60s</b>: כמה משימות הוזרמו לסשן ב־60 שניות האחרונות (חלוקה) <br/>
+          - <b>sentLast60s</b>: כמה משימות הועברו ל־Worker outbox ב־60 שניות האחרונות (מהירות בפועל של Dispatcher)
+        </div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>סטטוס</th>
+                <th>sessionId</th>
+                <th>phone</th>
+                <th>Trust</th>
+                <th>RPM (default/override)</th>
+                <th>routed/60s</th>
+                <th>sent/60s</th>
+                <th>Queue Len</th>
+                <th>Outbox</th>
+                <th>שליטה</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsTbody">
+              <tr><td colspan="10" class="muted">טוען...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>תקלות / למידה (SmartGuard Incidents)</h2>
+        <div class="muted small" style="margin-bottom:10px;">
+          אירועים אחרונים שנרשמים אוטומטית: FAIL, שגיאות consumer, שינויי RPM אוטומטיים וכו׳.
+        </div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>זמן</th>
+                <th>type</th>
+                <th>sessionId</th>
+                <th>phone</th>
+                <th>reason/action</th>
+              </tr>
+            </thead>
+            <tbody id="incidentsTbody">
+              <tr><td colspan="5" class="muted">טוען...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>AI Advisor (Gemini) - המלצות</h2>
+        <div class="muted small" style="margin-bottom:10px;">
+          מחזיר המלצות בלבד (לא מבצע פעולות לבד). דורש `GEMINI_API_KEY` בשרת.
+        </div>
+        <pre id="aiAdviceBox" class="mono" style="white-space:pre-wrap; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); padding:10px; border-radius:12px; min-height:70px;">—</pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // NOTE: this dashboard calls Orchestrator endpoints (same-origin):
+    // - GET  /api/anti-ban/status   (requires X-API-KEY header)
+    // - POST /api/anti-ban/sessions/:id/rpm  (requires X-API-KEY header)
+    const API_KEY = localStorage.getItem("API_KEY") || "change-me";
+    let timer = null;
+
+    function toast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.display = "none"; }, 2500);
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        ...opts,
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": API_KEY,
+          ...(opts.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.reason || ("HTTP " + res.status));
+      return data;
+    }
+
+    function setText(id, v) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    }
+
+    function renderSessions(statusData) {
+      const sessions = (statusData?.orchestrator?.outbox) || {};
+      const activeSessions = (statusData?.orchestrator?.sessionsCount) || 0;
+      const dispSessions = statusData?.dispatcher?.sessions?.sessions || [];
+
+      const outboxSum = Object.values(sessions).reduce((acc, x) => acc + (x.queued||0) + (x.processing||0), 0);
+      setText("kpiOutbox", String(outboxSum));
+      setText("kpiTotalSess", String(activeSessions));
+
+      const connectedCount = dispSessions.length;
+      setText("kpiConn", String(connectedCount));
+
+      const tbody = document.getElementById("sessionsTbody");
+      if (!dispSessions.length) {
+        tbody.innerHTML = `<tr><td colspan="10" class="muted">אין CONNECTED sessions כרגע (לכן אין חלוקה/שליחה)</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = dispSessions.map(s => {
+        const out = sessions[s.sessionId] || { queued: 0, processing: 0 };
+        const rpmLabel = (s.rpmOverride ? `${s.rpmDefault}/${s.rpmOverride}` : `${s.rpmDefault}/—`);
+        const status = "CONNECTED";
+
+        return `
+          <tr>
+            <td class="status ${status}">${status}</td>
+            <td class="mono">${s.sessionId}</td>
+            <td class="mono">${s.phone}</td>
+            <td class="mono">${s.trustLevel}</td>
+            <td class="mono">${rpmLabel}</td>
+            <td class="mono">${s.routedLast60s ?? 0}</td>
+            <td class="mono">${s.sentLast60s ?? 0}</td>
+            <td class="mono">${s.queueLen}</td>
+            <td class="mono">q:${out.queued} p:${out.processing}</td>
+            <td>
+              <div class="rowActions">
+                <select class="rpmSel" data-session="${s.sessionId}">
+                  <option value="">(clear)</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="15">15</option>
+                  <option value="20">20</option>
+                </select>
+                <button class="btn" onclick="applyRpm('${s.sessionId}')">Apply</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderSmartGuard(statusData) {
+      const enabled = statusData?.dispatcher?.smartGuard?.enabled;
+      const txt = enabled === true ? "ON" : (enabled === false ? "OFF" : "—");
+      document.getElementById("sgEnabled").textContent = txt;
+      document.getElementById("sgEnabled").style.color = enabled === true ? "#00ff88" : (enabled === false ? "#ffaa00" : "#9aa0a6");
+    }
+
+    function renderIncidents(statusData) {
+      const items = statusData?.incidents || [];
+      const tbody = document.getElementById("incidentsTbody");
+      if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">אין אירועים כרגע</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = items.slice(0, 30).map(it => {
+        const t = it.ts ? new Date(it.ts).toLocaleTimeString("he-IL") : "—";
+        const type = it.type || "—";
+        const sid = it.sessionId || "—";
+        const phone = it.phone || "—";
+        const ra = it.reason ? it.reason : (it.action ? JSON.stringify(it.action) : "");
+        return `<tr>
+          <td class="mono">${t}</td>
+          <td class="mono">${type}</td>
+          <td class="mono">${sid}</td>
+          <td class="mono">${phone}</td>
+          <td class="mono">${ra}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function renderKpis(statusData) {
+      setText("ts", new Date(statusData.timestamp).toLocaleTimeString("he-IL"));
+      setText("kpiGateway", String(statusData?.gatewayQueue?.length ?? "—"));
+      setText("kpiDispUrl", statusData?.dispatcherUrl || "—");
+
+      const running = statusData?.dispatcher?.health?.running;
+      setText("kpiDisp", running === true ? "YES" : (running === false ? "NO" : "—"));
+    }
+
+    async function refreshNow() {
+      try {
+        const data = await api("/api/anti-ban/status", { method: "GET" });
+        renderKpis(data);
+        renderSmartGuard(data);
+        renderSessions(data);
+        renderIncidents(data);
+      } catch (e) {
+        toast("שגיאה: " + (e.message || e));
+      }
+    }
+
+    async function applyGlobalRpm(rpm) {
+      try {
+        await api(`/api/anti-ban/global/rpm`, {
+          method: "POST",
+          body: JSON.stringify({ rpm })
+        });
+        toast("עודכן Global RPM");
+        await refreshNow();
+      } catch (e) {
+        toast("כשל בעדכון Global RPM: " + (e.message || e));
+      }
+    }
+
+    async function toggleSmartGuard() {
+      try {
+        const cur = document.getElementById("sgEnabled").textContent === "ON";
+        const enabled = !cur;
+        await api(`/api/anti-ban/smartguard/enable`, {
+          method: "POST",
+          body: JSON.stringify({ enabled })
+        });
+        toast("SmartGuard: " + (enabled ? "ON" : "OFF"));
+        await refreshNow();
+      } catch (e) {
+        toast("כשל בעדכון SmartGuard: " + (e.message || e));
+      }
+    }
+
+    async function fetchAiAdvice() {
+      const box = document.getElementById("aiAdviceBox");
+      box.textContent = "טוען AI...";
+      try {
+        const data = await api("/api/anti-ban/ai/advice", { method: "GET" });
+        if (data.parsed) {
+          box.textContent = JSON.stringify(data.parsed, null, 2);
+        } else {
+          box.textContent = data.rawText || "—";
+        }
+      } catch (e) {
+        box.textContent = "שגיאה: " + (e.message || e);
+      }
+    }
+
+    async function applyRpm(sessionId) {
+      const sel = document.querySelector(`select[data-session="${sessionId}"]`);
+      const v = sel.value;
+      const rpm = v === "" ? null : Number(v);
+      try {
+        await api(`/api/anti-ban/sessions/${encodeURIComponent(sessionId)}/rpm`, {
+          method: "POST",
+          body: JSON.stringify({ rpm })
+        });
+        toast("עודכן RPM לסשן " + sessionId);
+        await refreshNow();
+      } catch (e) {
+        toast("כשל בעדכון RPM: " + (e.message || e));
+      }
+    }
+
+    function updateRefresh() {
+      const sec = Number(document.getElementById("refreshSec").value);
+      if (timer) clearInterval(timer);
+      timer = setInterval(refreshNow, sec * 1000);
+    }
+
+    updateRefresh();
+    refreshNow();
+  </script>
+</body>
+</html>
+
+

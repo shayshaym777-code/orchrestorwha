@@ -1,0 +1,25 @@
+{
+  "name": "docker-wa-worker",
+  "version": "1.0.0",
+  "description": "WhatsApp Worker Node - Production Ready",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.16",
+    "@hapi/boom": "^10.0.1",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0",
+    "https-proxy-agent": "^7.0.2",
+    "socks-proxy-agent": "^8.0.2",
+    "fs-extra": "^11.2.0",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.1",
+    "@types/fs-extra": "^11.0.4"
+  }
+}

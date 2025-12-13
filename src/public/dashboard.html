@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Dashboard - מעקב חי</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #eee;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #00d4ff;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected { background: #00ff88; }
+        .status-dot.disconnected { background: #ff4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 1rem;
+            color: #888;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-value.success { color: #00ff88; }
+        .stat-value.warning { color: #ffaa00; }
+        .stat-value.error { color: #ff4444; }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .sessions-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .session-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .session-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .session-status.CONNECTED { background: #00ff88; }
+        .session-status.PENDING { background: #ffaa00; }
+        .session-status.WAITING_QR { background: #00d4ff; }
+        .session-status.ERROR, .session-status.BANNED { background: #ff4444; }
+
+        .session-phone {
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .session-meta {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .logs-container {
+            grid-column: 1 / -1;
+        }
+
+        .logs-list {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-item {
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .log-item.success { background: rgba(0, 255, 136, 0.1); border-right: 3px solid #00ff88; }
+        .log-item.error { background: rgba(255, 68, 68, 0.1); border-right: 3px solid #ff4444; }
+        .log-item.warning { background: rgba(255, 170, 0, 0.1); border-right: 3px solid #ffaa00; }
+        .log-item.info { background: rgba(0, 212, 255, 0.1); border-right: 3px solid #00d4ff; }
+
+        .log-time {
+            color: #666;
+            min-width: 80px;
+        }
+
+        .log-type {
+            min-width: 100px;
+            font-weight: bold;
+        }
+
+        .log-type.SENT { color: #00ff88; }
+        .log-type.FAILED { color: #ff4444; }
+        .log-type.QUEUED { color: #00d4ff; }
+        .log-type.NOT_EXISTS { color: #ffaa00; }
+
+        .log-phone {
+            min-width: 120px;
+            color: #aaa;
+        }
+
+        .log-message {
+            flex: 1;
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .alerts-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+        }
+
+        .alert-item.critical { background: rgba(255, 68, 68, 0.2); color: #ff6666; }
+        .alert-item.warning { background: rgba(255, 170, 0, 0.2); color: #ffcc00; }
+
+        .proxy-bar {
+            margin-bottom: 10px;
+        }
+
+        .proxy-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+        }
+
+        .proxy-progress {
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .proxy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            transition: width 0.3s;
+        }
+
+        .proxy-fill.warning { background: linear-gradient(90deg, #ffaa00, #ff6600); }
+        .proxy-fill.full { background: linear-gradient(90deg, #ff4444, #ff0000); }
+
+        .refresh-btn {
+            background: #00d4ff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            color: #000;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .refresh-btn:hover {
+            background: #00b8e6;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📱 WhatsApp Dashboard - מעקב חי</h1>
+        <div class="status-indicator">
+            <span id="lastUpdate">עדכון אחרון: --:--:--</span>
+            <div class="status-dot connected" id="statusDot"></div>
+            <button class="refresh-btn" onclick="refreshAll()">🔄 רענן</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="card">
+            <h2>📊 סטטיסטיקות</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value success" id="statSent">0</div>
+                    <div class="stat-label">נשלחו</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value error" id="statFailed">0</div>
+                    <div class="stat-label">נכשלו</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value warning" id="statQueued">0</div>
+                    <div class="stat-label">בתור</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">סה"כ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessions Card -->
+        <div class="card">
+            <h2>📱 סשנים פעילים</h2>
+            <div class="sessions-list" id="sessionsList">
+                <div class="session-item">
+                    <div class="session-info">
+                        <div class="session-status CONNECTED"></div>
+                        <div>
+                            <div class="session-phone">טוען...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proxies Card -->
+        <div class="card">
+            <h2>🔌 ניצולת פרוקסים</h2>
+            <div id="proxyList">
+                <div class="proxy-bar">
+                    <div class="proxy-label">
+                        <span>טוען...</span>
+                        <span>0/4</span>
+                    </div>
+                    <div class="proxy-progress">
+                        <div class="proxy-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Card -->
+        <div class="card">
+            <h2>⚠️ התראות</h2>
+            <div class="alerts-list" id="alertsList">
+                <div class="alert-item info">אין התראות</div>
+            </div>
+        </div>
+
+        <!-- Logs Card -->
+        <div class="card logs-container">
+            <h2>📝 לוג הודעות (Live)</h2>
+            <div class="logs-list" id="logsList">
+                <!-- Logs will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'change-me';
+        const API_BASE = '';
+        let logs = [];
+
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: { 'X-API-KEY': API_KEY }
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+        async function refreshDashboard() {
+            const data = await fetchData('/api/dashboard');
+            if (!data || data.status !== 'ok') return;
+
+            // Update stats
+            document.getElementById('statTotal').textContent = data.stats.totalSessions || 0;
+            document.getElementById('statSent').textContent = data.inventory?.profiles?.used || 0;
+            document.getElementById('statQueued').textContent = data.alerts?.total || 0;
+        }
+
+        async function refreshSessions() {
+            const data = await fetchData('/api/dashboard/sessions');
+            if (!data || data.status !== 'ok') return;
+
+            const container = document.getElementById('sessionsList');
+            if (data.sessions.length === 0) {
+                container.innerHTML = '<div class="session-item"><div class="session-info">אין סשנים פעילים</div></div>';
+                return;
+            }
+
+            container.innerHTML = data.sessions.map(s => `
+                <div class="session-item">
+                    <div class="session-info">
+                        <div class="session-status ${s.status}"></div>
+                        <div>
+                            <div class="session-phone">${s.phone || s.sessionId}</div>
+                            <div class="session-meta">${s.status} | ${s.sessionId}</div>
+                        </div>
+                    </div>
+                    <div class="session-meta">${formatTime(s.lastPing || s.lastUpdated)}</div>
+                </div>
+            `).join('');
+        }
+
+        async function refreshProxies() {
+            const data = await fetchData('/api/dashboard');
+            if (!data || data.status !== 'ok') return;
+
+            const container = document.getElementById('proxyList');
+            if (!data.proxyUsage || data.proxyUsage.length === 0) {
+                container.innerHTML = '<div class="proxy-bar"><div class="proxy-label"><span>אין פרוקסים</span></div></div>';
+                return;
+            }
+
+            container.innerHTML = data.proxyUsage.map(p => {
+                const percent = (p.sessions / p.max) * 100;
+                const fillClass = percent >= 100 ? 'full' : percent >= 75 ? 'warning' : '';
+                return `
+                    <div class="proxy-bar">
+                        <div class="proxy-label">
+                            <span>${p.proxyId}</span>
+                            <span>${p.sessions}/${p.max}</span>
+                        </div>
+                        <div class="proxy-progress">
+                            <div class="proxy-fill ${fillClass}" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function refreshAlerts() {
+            const data = await fetchData('/api/dashboard/alerts?limit=10');
+            if (!data || data.status !== 'ok') return;
+
+            const container = document.getElementById('alertsList');
+            if (!data.alerts || data.alerts.length === 0) {
+                container.innerHTML = '<div class="alert-item info">✅ אין התראות</div>';
+                return;
+            }
+
+            container.innerHTML = data.alerts.slice(0, 10).map(a => `
+                <div class="alert-item ${a.severity}">
+                    ${a.severity === 'critical' ? '🔴' : '🟡'} ${a.message}
+                </div>
+            `).join('');
+        }
+
+        function addLog(type, phone, message, status = 'info') {
+            const now = new Date();
+            const time = now.toLocaleTimeString('he-IL');
+            
+            logs.unshift({ time, type, phone, message, status });
+            if (logs.length > 100) logs.pop();
+            
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logsList');
+            container.innerHTML = logs.map(log => `
+                <div class="log-item ${log.status}">
+                    <span class="log-time">${log.time}</span>
+                    <span class="log-type ${log.type}">${log.type}</span>
+                    <span class="log-phone">${log.phone}</span>
+                    <span class="log-message">${log.message}</span>
+                </div>
+            `).join('');
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return '--:--';
+            const date = new Date(parseInt(timestamp));
+            return date.toLocaleTimeString('he-IL');
+        }
+
+        async function refreshAll() {
+            document.getElementById('statusDot').className = 'status-dot';
+            
+            await Promise.all([
+                refreshDashboard(),
+                refreshSessions(),
+                refreshProxies(),
+                refreshAlerts()
+            ]);
+
+            document.getElementById('statusDot').className = 'status-dot connected';
+            document.getElementById('lastUpdate').textContent = 
+                `עדכון אחרון: ${new Date().toLocaleTimeString('he-IL')}`;
+        }
+
+        // Fetch real logs from API
+        async function refreshLogs() {
+            const data = await fetchData('/api/logs?limit=100');
+            if (!data || data.status !== 'ok') return;
+
+            logs = data.logs.map(log => ({
+                time: new Date(log.timestamp).toLocaleTimeString('he-IL'),
+                type: log.type,
+                phone: log.phone,
+                message: log.message || log.messagePreview || '',
+                status: getStatusFromType(log.type)
+            }));
+
+            renderLogs();
+
+            // Update stats
+            const stats = await fetchData('/api/logs/stats');
+            if (stats && stats.status === 'ok') {
+                document.getElementById('statSent').textContent = stats.stats.sent || 0;
+                document.getElementById('statFailed').textContent = stats.stats.failed || 0;
+                document.getElementById('statQueued').textContent = stats.stats.queued || 0;
+                document.getElementById('statTotal').textContent = stats.stats.total || 0;
+            }
+        }
+
+        function getStatusFromType(type) {
+            switch(type) {
+                case 'SENT': return 'success';
+                case 'FAILED': case 'BANNED': case 'TIMEOUT': return 'error';
+                case 'NOT_EXISTS': return 'warning';
+                default: return 'info';
+            }
+        }
+
+        // Initialize
+        async function init() {
+            await refreshAll();
+            await refreshLogs();
+        }
+        
+        init();
+        setInterval(refreshAll, 10000); // Refresh every 10 seconds
+        setInterval(refreshLogs, 3000); // Refresh logs every 3 seconds
+    </script>
+</body>
+</html>
+

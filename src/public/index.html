@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Orchestrator</title>
+    <style>
+        :root {
+            --primary: #00d4ff;
+            --success: #00ff88;
+            --warning: #ffaa00;
+            --danger: #ff4444;
+            --dark: #0a0a1a;
+            --darker: #050510;
+            --card: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.08);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        /* Navigation */
+        .navbar {
+            background: rgba(0,0,0,0.5);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .nav-link {
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #888;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: var(--card);
+            color: var(--primary);
+        }
+        
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .api-input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            width: 120px;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.online { background: var(--success); }
+        .status-dot.offline { background: var(--danger); }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Main Container */
+        .container {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .stat-value.green { color: var(--success); }
+        .stat-value.yellow { color: var(--warning); }
+        .stat-value.red { color: var(--danger); }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-body {
+            padding: 15px 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        /* Sessions with QR */
+        .session-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        
+        .session-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid var(--border);
+        }
+        
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .session-phone {
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .session-status {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .session-status.CONNECTED {
+            background: rgba(0,255,136,0.2);
+            color: var(--success);
+        }
+        
+        .session-status.WAITING_QR {
+            background: rgba(0,212,255,0.2);
+            color: var(--primary);
+        }
+        
+        .session-status.PENDING {
+            background: rgba(255,170,0,0.2);
+            color: var(--warning);
+        }
+        
+        .session-status.ERROR, .session-status.BANNED {
+            background: rgba(255,68,68,0.2);
+            color: var(--danger);
+        }
+        
+        .session-status.RECONNECTING {
+            background: rgba(255,170,0,0.2);
+            color: var(--warning);
+        }
+        
+        .session-qr {
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        .session-qr img {
+            max-width: 180px;
+            width: 100%;
+        }
+        
+        .session-qr.waiting {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .session-meta {
+            font-size: 11px;
+            color: #666;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        
+        .session-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: #000;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+            transform: scale(1.02);
+        }
+        
+        /* Alerts */
+        .alert-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-item.critical {
+            background: rgba(255,68,68,0.15);
+            border-left: 3px solid var(--danger);
+        }
+        
+        .alert-item.warning {
+            background: rgba(255,170,0,0.15);
+            border-left: 3px solid var(--warning);
+        }
+        
+        /* Live Log */
+        .log-box {
+            background: #050505;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .log-entry:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .log-time { color: #555; min-width: 70px; }
+        .log-icon { min-width: 20px; }
+        .log-phone { color: var(--primary); min-width: 100px; }
+        .log-msg { color: #888; }
+        
+        /* Add Session Button */
+        .add-session-card {
+            background: rgba(0,212,255,0.05);
+            border: 2px dashed rgba(0,212,255,0.3);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .add-session-card:hover {
+            background: rgba(0,212,255,0.1);
+            border-color: var(--primary);
+        }
+        
+        .add-session-card .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--dark);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            color: var(--primary);
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state .icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .nav-links {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .nav-link {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .stat-value {
+                font-size: 22px;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .session-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .api-input {
+                width: 80px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            
+            .stat-card {
+                padding: 10px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+            
+            .card-body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo">
+            📱 WhatsApp Orchestrator
+        </div>
+        <div class="nav-links">
+            <a href="#" class="nav-link active" data-page="dashboard">🏠 ראשי</a>
+            <a href="#" class="nav-link" data-page="sessions">📱 סשנים</a>
+            <a href="#" class="nav-link" data-page="logs">📝 לוגים</a>
+            <a href="#" class="nav-link" data-page="settings">⚙️ הגדרות</a>
+        </div>
+        <div class="nav-controls">
+            <input type="password" id="apiKey" class="api-input" placeholder="API Key" value="change-me">
+            <div class="status-badge">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">מתחבר...</span>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSessions">-</div>
+                <div class="stat-label">סה"כ סשנים</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value green" id="connectedSessions">-</div>
+                <div class="stat-label">🟢 מחוברים</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value yellow" id="reconnectingSessions">-</div>
+                <div class="stat-label">🔄 מתחברים</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="waitingQR">-</div>
+                <div class="stat-label">📱 ממתינים QR</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value red" id="failedSessions">-</div>
+                <div class="stat-label">❌ נכשלו</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="proxiesCount">-</div>
+                <div class="stat-label">פרוקסי</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="profilesCount">-</div>
+                <div class="stat-label">פרופילים</div>
+            </div>
+        </div>
+        
+        <!-- Sessions Grid (Main Content) -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <div class="card-title">📱 סשנים וחיבורים</div>
+                <button class="btn btn-primary" onclick="showAddSessionModal()">➕ הוסף סשן</button>
+            </div>
+            <div class="card-body">
+                <div class="session-grid" id="sessionsGrid">
+                    <div class="empty-state">
+                        <div class="icon">📱</div>
+                        <p>טוען סשנים...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Grid -->
+        <div class="grid">
+            <!-- Alerts -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">⚠️ התראות</div>
+                </div>
+                <div class="card-body" id="alertsContainer">
+                    <div class="empty-state">אין התראות</div>
+                </div>
+            </div>
+            
+            <!-- Live Log -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📝 לוג הודעות</div>
+                    <a href="/live-log" target="_blank" class="btn btn-sm btn-primary">מסך מלא</a>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="log-box" id="logBox">
+                        <div class="log-entry">
+                            <span class="log-time">--:--</span>
+                            <span class="log-icon">⏳</span>
+                            <span class="log-msg">מחכה לאירועים...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Session Modal -->
+    <div class="modal" id="addSessionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">➕ הוספת סשן חדש</div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="addSessionForm" onsubmit="addSession(event)">
+                <div class="form-group">
+                    <label class="form-label">מזהה סשן (אופציונלי)</label>
+                    <input type="text" class="form-input" id="sessionIdInput" placeholder="יווצר אוטומטית">
+                </div>
+                <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
+                    📱 מספר הטלפון יתקבל אוטומטית אחרי סריקת ה-QR
+                </p>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">צור סשן</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Session Detail Modal -->
+    <div class="modal" id="sessionDetailModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title" id="sessionDetailTitle">פרטי סשן</div>
+                <button class="modal-close" onclick="closeSessionDetail()">&times;</button>
+            </div>
+            <div id="sessionDetailContent"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        let refreshInterval;
+        
+        function getApiKey() {
+            return document.getElementById('apiKey').value;
+        }
+        
+        async function api(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'X-API-KEY': getApiKey(),
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (err) {
+                console.error(`API Error:`, err);
+                return null;
+            }
+        }
+        
+        async function refreshDashboard() {
+            const data = await api('/api/v1/dashboard/full');
+            
+            if (!data || data.status !== 'ok') {
+                document.getElementById('statusDot').className = 'status-dot offline';
+                document.getElementById('statusText').textContent = 'לא מחובר';
+                return;
+            }
+            
+            document.getElementById('statusDot').className = 'status-dot online';
+            document.getElementById('statusText').textContent = 'מחובר';
+            
+            // Update stats
+            const stats = data.data.stats;
+            document.getElementById('totalSessions').textContent = stats.totalSessions;
+            document.getElementById('connectedSessions').textContent = stats.connected;
+            document.getElementById('reconnectingSessions').textContent = stats.reconnecting || 0;
+            document.getElementById('waitingQR').textContent = stats.waitingQR;
+            document.getElementById('failedSessions').textContent = stats.failed;
+            
+            const inv = data.data.inventory;
+            document.getElementById('proxiesCount').textContent = inv.proxies.available;
+            document.getElementById('profilesCount').textContent = inv.profiles.available;
+            
+            // Update sessions
+            renderSessions(data.data.sessions);
+            
+            // Update alerts
+            renderAlerts(data.data.alerts);
+        }
+        
+        function renderSessions(sessions) {
+            const container = document.getElementById('sessionsGrid');
+            
+            if (!sessions || sessions.length === 0) {
+                container.innerHTML = `
+                    <div class="add-session-card" onclick="showAddSessionModal()">
+                        <div class="icon">➕</div>
+                        <div>הוסף סשן חדש</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = sessions.map(s => {
+                const uptimeStr = s.uptime ? formatUptime(s.uptime) : '-';
+                
+                return `
+                    <div class="session-card" onclick="showSessionDetail('${s.sessionId}')">
+                        <div class="session-header">
+                            <span class="session-phone">${s.phone || s.sessionId.slice(0, 12)}</span>
+                            <span class="session-status ${s.status}">${s.status}</span>
+                        </div>
+                        ${s.status === 'WAITING_QR' ? `
+                            <div class="session-qr" id="qr-${s.sessionId}">
+                                <div style="color: #666; font-size: 12px;">טוען QR...</div>
+                            </div>
+                        ` : s.status === 'CONNECTED' ? `
+                            <div style="text-align: center; padding: 20px; color: var(--success);">
+                                ✅ מחובר
+                            </div>
+                        ` : s.status === 'RECONNECTING' ? `
+                            <div style="text-align: center; padding: 20px; color: var(--warning);">
+                                🔄 מתחבר מחדש...
+                            </div>
+                        ` : `
+                            <div style="text-align: center; padding: 20px; color: #666;">
+                                ${getStatusIcon(s.status)} ${getStatusText(s.status)}
+                            </div>
+                        `}
+                        <div class="session-meta">
+                            <span>⏱️ Uptime: ${uptimeStr}</span>
+                            <span>📨 הודעות: ${s.messageCount || 0}</span>
+                            ${s.proxyIp ? `<span>🌐 IP: ${s.proxyIp}</span>` : ''}
+                        </div>
+                        <div class="session-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-primary" onclick="restartSession('${s.sessionId}')">🔄</button>
+                            <button class="btn btn-sm btn-danger" onclick="stopSession('${s.sessionId}')">⏹️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Add "add session" card
+            html += `
+                <div class="add-session-card" onclick="showAddSessionModal()">
+                    <div class="icon">➕</div>
+                    <div>הוסף סשן</div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+            
+            // Load QR codes for waiting sessions
+            sessions.filter(s => s.status === 'WAITING_QR').forEach(s => loadQR(s.sessionId));
+        }
+        
+        async function loadQR(sessionId) {
+            const qrData = await api(`/api/v1/dashboard/qr/${sessionId}`);
+            const container = document.getElementById(`qr-${sessionId}`);
+            if (!container) return;
+            
+            if (qrData && qrData.data && qrData.data.qr) {
+                // QR is base64 image
+                container.innerHTML = `<img src="${qrData.data.qr}" alt="QR Code">`;
+            } else {
+                container.innerHTML = `<div style="color: #888; font-size: 11px;">סרוק עם הטלפון כדי להתחבר</div>`;
+            }
+        }
+        
+        function renderAlerts(alertsData) {
+            const container = document.getElementById('alertsContainer');
+            
+            if (!alertsData || !alertsData.alerts || alertsData.alerts.length === 0) {
+                container.innerHTML = `<div class="empty-state">✅ אין התראות</div>`;
+                return;
+            }
+            
+            container.innerHTML = alertsData.alerts.slice(0, 10).map(a => `
+                <div class="alert-item ${a.severity}">
+                    ${a.severity === 'critical' ? '🔴' : '🟡'} ${a.message}
+                </div>
+            `).join('');
+        }
+        
+        async function refreshLogs() {
+            const data = await api('/api/v1/dashboard/events?limit=20');
+            if (!data || !data.data || !data.data.events) return;
+            
+            const container = document.getElementById('logBox');
+            const events = data.data.events;
+            
+            if (events.length === 0) {
+                container.innerHTML = `
+                    <div class="log-entry">
+                        <span class="log-time">--:--</span>
+                        <span class="log-icon">⏳</span>
+                        <span class="log-msg">מחכה לאירועים...</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = events.map(e => {
+                const time = new Date(e.timestamp).toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
+                return `
+                    <div class="log-entry">
+                        <span class="log-time">${time}</span>
+                        <span class="log-icon">${e.icon || '📝'}</span>
+                        <span class="log-phone">${e.phone || '-'}</span>
+                        <span class="log-msg">${e.message || e.type}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function getStatusIcon(status) {
+            const icons = {
+                CONNECTED: '✅',
+                WAITING_QR: '📱',
+                PENDING: '⏳',
+                RECONNECTING: '🔄',
+                ERROR: '❌',
+                BANNED: '🚫',
+                STARTING: '🚀'
+            };
+            return icons[status] || '❓';
+        }
+        
+        function getStatusText(status) {
+            const texts = {
+                CONNECTED: 'מחובר',
+                WAITING_QR: 'ממתין לסריקה',
+                PENDING: 'ממתין...',
+                RECONNECTING: 'מתחבר מחדש',
+                ERROR: 'שגיאה',
+                BANNED: 'נחסם',
+                STARTING: 'מתחיל...'
+            };
+            return texts[status] || status;
+        }
+        
+        function formatUptime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            if (hours > 0) return `${hours}h ${minutes % 60}m`;
+            if (minutes > 0) return `${minutes}m`;
+            return `${seconds}s`;
+        }
+        
+        // Modal functions
+        function showAddSessionModal() {
+            document.getElementById('addSessionModal').classList.add('show');
+            loadProfiles();
+        }
+        
+        function closeModal() {
+            document.getElementById('addSessionModal').classList.remove('show');
+        }
+        
+        async function loadProfiles() {
+            const data = await api('/api/v1/dashboard/inventory');
+            // For now, just show count
+        }
+        
+        async function addSession(e) {
+            e.preventDefault();
+            const sessionId = document.getElementById('sessionIdInput').value.trim();
+            
+            const result = await api('/api/sessions/provision', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    sessionId: sessionId || undefined 
+                })
+            });
+            
+            if (result && result.status === 'ok') {
+                closeModal();
+                document.getElementById('sessionIdInput').value = '';
+                refreshDashboard();
+                alert('סשן נוצר! סרוק את ה-QR כדי להתחבר.\n\nSession ID: ' + (result.sessionId || ''));
+            } else {
+                alert('שגיאה ביצירת סשן: ' + (result?.reason || 'Unknown'));
+            }
+        }
+        
+        async function showSessionDetail(sessionId) {
+            const data = await api(`/api/v1/dashboard/sessions/${sessionId}`);
+            if (!data || !data.data) return;
+            
+            const s = data.data;
+            document.getElementById('sessionDetailTitle').textContent = `📱 ${s.phone || s.sessionId}`;
+            
+            document.getElementById('sessionDetailContent').innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <span class="session-status ${s.status}" style="font-size: 14px;">${s.status}</span>
+                </div>
+                ${s.qr ? `
+                    <div class="session-qr" style="margin-bottom: 15px;">
+                        <img src="${s.qr}" alt="QR Code" style="max-width: 200px;">
+                    </div>
+                ` : ''}
+                <div class="session-meta" style="font-size: 13px; line-height: 2;">
+                    <div>📱 מזהה: <strong>${s.sessionId}</strong></div>
+                    <div>📞 טלפון: <strong>${s.phone || '-'}</strong></div>
+                    <div>⏱️ Uptime: <strong>${s.uptime ? formatUptime(s.uptime) : '-'}</strong></div>
+                    <div>📨 הודעות: <strong>${s.messageCount || 0}</strong></div>
+                    <div>🌐 IP: <strong>${s.proxyIp || '-'}</strong></div>
+                    <div>🔒 Fingerprint: <strong>${s.fingerprint || '-'}</strong></div>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px;">
+                    <button class="btn btn-primary" onclick="restartSession('${s.sessionId}'); closeSessionDetail();">🔄 הפעל מחדש</button>
+                    <button class="btn btn-danger" onclick="stopSession('${s.sessionId}'); closeSessionDetail();">⏹️ עצור</button>
+                </div>
+            `;
+            
+            document.getElementById('sessionDetailModal').classList.add('show');
+        }
+        
+        function closeSessionDetail() {
+            document.getElementById('sessionDetailModal').classList.remove('show');
+        }
+        
+        async function restartSession(sessionId) {
+            if (!confirm('להפעיל מחדש את הסשן?')) return;
+            await api(`/api/sessions/${sessionId}/restart`, { method: 'POST' });
+            refreshDashboard();
+        }
+        
+        async function stopSession(sessionId) {
+            if (!confirm('לעצור את הסשן?')) return;
+            await api(`/api/sessions/${sessionId}/stop`, { method: 'POST' });
+            refreshDashboard();
+        }
+        
+        // Navigation
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                // Handle page navigation if needed
+            });
+        });
+        
+        // Initialize
+        async function init() {
+            await refreshDashboard();
+            await refreshLogs();
+            
+            // Auto refresh every 5 seconds
+            refreshInterval = setInterval(() => {
+                refreshDashboard();
+                refreshLogs();
+            }, 5000);
+        }
+        
+        init();
+    </script>
+</body>
+</html>

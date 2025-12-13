@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Test webhook server - receives and displays all worker events
+  webhook-server:
+    build: ./test-server
+    container_name: wa_test_webhook
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  # Example worker session - uncomment to use
+  # worker-123:
+  #   build: .
+  #   container_name: wa_session_123
+  #   depends_on:
+  #     - webhook-server
+  #   environment:
+  #     - SESSION_ID=123
+  #     - WEBHOOK_URL=http://webhook-server:3000/webhook
+  #     - BROWSER_OS=Windows
+  #     - BROWSER_NAME=Chrome
+  #     - BROWSER_VERSION=120.0
+  #   volumes:
+  #     - ./test-sessions/123:/app/sessions/123
+  #   restart: "no"
+
+networks:
+  default:
+    name: wa-test-network
+

@@ -1,0 +1,71 @@
+# =====================================================
+# WhatsApp Orchestrator - Git Ignore
+# =====================================================
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment (NEVER commit!)
+.env
+.env.local
+.env.production
+
+# Sessions data (contains auth credentials!)
+sessions/
+*/sessions/
+*.session
+
+# Backups (large files)
+backups/
+*.zip
+*.tar.gz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Database
+*.sqlite
+*.db
+data/
+
+# Private/sensitive files
+*.private.txt
+proxies.updated.*.txt
+*.secret
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Docker (local volumes)
+docker-data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Uploaded files
+uploads/
+
+# Test artifacts
+*.test.log
+test-sessions/

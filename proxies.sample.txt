@@ -1,0 +1,4 @@
+# Sample format (DO NOT put real passwords in repo)
+# socks5h://user-xxx-ip-1.2.3.4:PASSWORD@isp.decodo.com:10001
+
+
