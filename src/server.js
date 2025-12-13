@@ -65,6 +65,11 @@ app.get("/scan", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "scan.html"));
 });
 
+// OBS QR Display - dedicated page for OBS Browser Source
+app.get("/obs-qr", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "obs-qr.html"));
+});
+
 app.use("/api/messages", messagesRouter);
 app.use("/api/v1/dashboard", dashboardApiRouter);
 app.use("/api/v1/backups", backupRouter);
