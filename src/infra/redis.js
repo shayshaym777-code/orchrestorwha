@@ -11,7 +11,8 @@ const memoryStore = {
   strings: new Map(),
   hashes: new Map(),
   sets: new Map(),
-  lists: new Map()
+  lists: new Map(),
+  sortedSets: new Map()  // For ZADD/ZRANGE etc
 };
 
 // Memory-based mock Redis client
@@ -187,6 +188,112 @@ class MemoryRedis {
   async scard(key) {
     const set = memoryStore.sets.get(key);
     return set ? set.size : 0;
+  }
+
+  // Sorted Set operations
+  async zadd(key, ...args) {
+    if (!memoryStore.sortedSets.has(key)) {
+      memoryStore.sortedSets.set(key, new Map());
+    }
+    const zset = memoryStore.sortedSets.get(key);
+    let added = 0;
+    
+    // Handle both zadd(key, score, member) and zadd(key, score1, member1, score2, member2...)
+    for (let i = 0; i < args.length; i += 2) {
+      const score = parseFloat(args[i]);
+      const member = String(args[i + 1]);
+      if (!zset.has(member)) added++;
+      zset.set(member, score);
+    }
+    return added;
+  }
+
+  async zcard(key) {
+    const zset = memoryStore.sortedSets.get(key);
+    return zset ? zset.size : 0;
+  }
+
+  async zrem(key, ...members) {
+    const zset = memoryStore.sortedSets.get(key);
+    if (!zset) return 0;
+    let removed = 0;
+    for (const member of members) {
+      if (zset.delete(String(member))) removed++;
+    }
+    return removed;
+  }
+
+  async zrange(key, start, stop) {
+    const zset = memoryStore.sortedSets.get(key);
+    if (!zset) return [];
+    const sorted = Array.from(zset.entries()).sort((a, b) => a[1] - b[1]);
+    const end = stop === -1 ? sorted.length : stop + 1;
+    return sorted.slice(start, end).map(([member]) => member);
+  }
+
+  async zrevrange(key, start, stop) {
+    const zset = memoryStore.sortedSets.get(key);
+    if (!zset) return [];
+    const sorted = Array.from(zset.entries()).sort((a, b) => b[1] - a[1]);
+    const end = stop === -1 ? sorted.length : stop + 1;
+    return sorted.slice(start, end).map(([member]) => member);
+  }
+
+  async zrangebyscore(key, min, max) {
+    const zset = memoryStore.sortedSets.get(key);
+    if (!zset) return [];
+    const minScore = min === '-inf' ? -Infinity : parseFloat(min);
+    const maxScore = max === '+inf' ? Infinity : parseFloat(max);
+    const sorted = Array.from(zset.entries())
+      .filter(([, score]) => score >= minScore && score <= maxScore)
+      .sort((a, b) => a[1] - b[1]);
+    return sorted.map(([member]) => member);
+  }
+
+  async zscore(key, member) {
+    const zset = memoryStore.sortedSets.get(key);
+    if (!zset) return null;
+    const score = zset.get(String(member));
+    return score !== undefined ? score : null;
+  }
+
+  // Additional List operations
+  async lindex(key, index) {
+    const list = memoryStore.lists.get(key);
+    if (!list) return null;
+    const idx = index < 0 ? list.length + index : index;
+    return list[idx] || null;
+  }
+
+  async lset(key, index, value) {
+    const list = memoryStore.lists.get(key);
+    if (!list) throw new Error('ERR no such key');
+    const idx = index < 0 ? list.length + index : index;
+    if (idx < 0 || idx >= list.length) throw new Error('ERR index out of range');
+    list[idx] = value;
+    return 'OK';
+  }
+
+  // TTL operations
+  async ttl(key) {
+    // Memory store doesn't track TTL, return -1 (no expiry)
+    return -1;
+  }
+
+  async pttl(key) {
+    return -1;
+  }
+
+  // Hash increment
+  async hincrby(key, field, increment) {
+    if (!memoryStore.hashes.has(key)) {
+      memoryStore.hashes.set(key, new Map());
+    }
+    const hash = memoryStore.hashes.get(key);
+    const current = parseInt(hash.get(field) || '0', 10);
+    const newVal = current + parseInt(increment, 10);
+    hash.set(field, String(newVal));
+    return newVal;
   }
 
   async quit() {
