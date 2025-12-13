@@ -1139,9 +1139,10 @@ function startKeepAliveEngine() {
   const hiddenMsgInterval = setInterval(async () => {
     if (sock && sessionState.status === "CONNECTED" && sessionState.jid) {
       try {
-        // שליחת הודעה נעלמת לעצמך (לא נראית בצ'אטים)
+        // שליחת הודעה קצרה לעצמך לשמירה על החיבור
         await sock.sendMessage(sessionState.jid, { 
-          text: "🔄",
+          text: "🔄"
+        }, {
           ephemeralExpiration: 86400 // נעלם אחרי 24 שעות
         });
         logTelemetry("HIDDEN_MESSAGE", { sent: true });
