@@ -624,15 +624,15 @@ async function listWorkersHandler(req, res, next) {
  * POST /api/sessions/provision - Allocate + Start in one call
  * Body: { sessionId?: string, phone?: string, proxy?: string }
  * - sessionId: Optional custom session ID
- * - phone: Optional, will be "pending" until QR scan
+ * - phone: Optional, will be unique placeholder until QR scan
  * - proxy: Optional, manual proxy URL (socks5h://...)
  */
 async function provisionSession(req, res, next) {
   try {
     const { phone, sessionId: customSessionId, sessionsPath, proxy: manualProxy } = req.body;
     
-    // Phone is optional - will be set after QR scan
-    const phoneValue = phone || "pending";
+    // Phone is optional - generate unique placeholder for OBS/auto sessions
+    const phoneValue = phone || `pending_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     
     // Step 1: Generate session ID
     const allocSessionId = customSessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

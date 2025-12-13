@@ -93,7 +93,7 @@ async function selectBestSession(options = {}) {
     }
     
     // No hot sessions available
-    return {
+    return { 
       sessionId: null,
       grade: null,
       reason: "NO_HOT_SESSIONS_AVAILABLE",
@@ -205,7 +205,7 @@ async function dispatchMessage(options) {
   }));
   await redis.ltrim("dispatch:log", 0, 999); // Keep last 1000
   
-  return {
+  return { 
     status: "DISPATCHED",
     messageId: messageData.id,
     sessionId: selection.sessionId,
@@ -259,7 +259,7 @@ async function processPendingQueue(maxItems = 10) {
       // Remove from pending queue
       await redis.zrem("queue:pending", itemJson);
       results.push({ ...result, fromQueue: true });
-    } else {
+      } else {
       // Increment retry count
       item.retryCount = (item.retryCount || 0) + 1;
       
