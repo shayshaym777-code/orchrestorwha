@@ -51,8 +51,27 @@ async function storeWebhookEvent(payload) {
     meta
   };
 
+  // ✅ Auto-register session in active sessions set (workers self-register)
+  await redis.sadd("sessions:active", sessionId);
+  
+  // Initialize or update session data hash
+  const sessionKey = `session:${sessionId}`;
+  const existingSession = await redis.hgetall(sessionKey);
+  
+  if (!existingSession || Object.keys(existingSession).length === 0) {
+    // First event from this session - create it
+    await redis.hset(sessionKey, {
+      sessionId,
+      phone: "pending",
+      status: "WAITING_QR",
+      createdAt: String(timestamp),
+      fingerprint: meta.fingerprint || "",
+      proxy: meta.proxy || ""
+    });
+    console.log(`[Webhook] New session registered: ${sessionId}`);
+  }
+
   // Store "latest meta"
-  // meta.proxy can be either the proxy URL or the egress IP; store as-is.
   await redis.hset(`session:meta:${sessionId}`, {
     fingerprint: meta.fingerprint ? String(meta.fingerprint) : "",
     proxy: meta.proxy ? String(meta.proxy) : ""
@@ -71,24 +90,35 @@ async function storeWebhookEvent(payload) {
     if (qrImage) {
       await redis.set(qrKey, qrImage, "EX", 60 * 5); // 5 minutes
     }
+    // Update session status to WAITING_QR
+    await redis.hset(sessionKey, { status: "WAITING_QR" });
   }
 
-  // Store latest status (best-effort)
+  // Store latest status
   if (type === "CONNECTED") {
-    await redis.set(`session:status:${sessionId}`, "CONNECTED", "EX", 60 * 60 * 24);
+    await redis.hset(sessionKey, { 
+      status: "CONNECTED",
+      connectedAt: String(timestamp)
+    });
     // Also store phone number if available
     if (data.phoneNumber) {
+      await redis.hset(sessionKey, {
+        phone: String(data.phoneNumber)
+      });
       await redis.hset(`session:meta:${sessionId}`, {
         phoneNumber: String(data.phoneNumber),
         jid: data.jid ? String(data.jid) : ""
       });
     }
   } else if (type === "STATUS_CHANGE" && isPlainObject(data) && typeof data.status === "string") {
-    await redis.set(`session:status:${sessionId}`, data.status, "EX", 60 * 60 * 24);
+    await redis.hset(sessionKey, { status: data.status });
+  } else if (type === "ERROR" || type === "DISCONNECTED") {
+    await redis.hset(sessionKey, { status: "ERROR" });
   }
 
   // Update last ping timestamp
   if (type === "PING") {
+    await redis.hset(sessionKey, { lastPing: String(timestamp) });
     await redis.hset(`session:meta:${sessionId}`, {
       lastPing: String(timestamp),
       uptime: data.uptime ? String(data.uptime) : ""
