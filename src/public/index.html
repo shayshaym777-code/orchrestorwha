@@ -635,10 +635,10 @@
                     <input type="text" class="form-input" id="sessionIdInput" placeholder="יווצר אוטומטית">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">🌐 פרוקסי (אופציונלי)</label>
+                    <label class="form-label">פרוקסי (אופציונלי)</label>
                     <input type="text" class="form-input" id="proxyInput" placeholder="socks5h://user:pass@host:port">
                     <p style="font-size: 11px; color: #666; margin-top: 5px;">
-                        השאר ריק אם אין פרוקסי או אם יש פרוקסיים במערכת
+                        אם לא מוגדר, ישתמש בפרוקסי מהמערכת (אם יש)
                     </p>
                 </div>
                 <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
@@ -898,12 +898,13 @@
             const sessionId = document.getElementById('sessionIdInput').value.trim();
             const proxy = document.getElementById('proxyInput').value.trim();
             
+            const body = {};
+            if (sessionId) body.sessionId = sessionId;
+            if (proxy) body.proxy = proxy;
+            
             const result = await api('/api/sessions/provision', {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    sessionId: sessionId || undefined,
-                    proxy: proxy || undefined
-                })
+                body: JSON.stringify(body)
             });
             
             if (result && result.status === 'ok') {
@@ -911,7 +912,7 @@
                 document.getElementById('sessionIdInput').value = '';
                 document.getElementById('proxyInput').value = '';
                 refreshDashboard();
-                alert('סשן נוצר! סרוק את ה-QR כדי להתחבר.\n\nSession ID: ' + (result.sessionId || ''));
+                alert('סשן נוצר! סרוק את ה-QR כדי להתחבר.\n\nSession ID: ' + (result.sessionId || '') + '\nProxy: ' + (result.proxy || 'none'));
             } else {
                 alert('שגיאה ביצירת סשן: ' + (result?.reason || 'Unknown'));
             }

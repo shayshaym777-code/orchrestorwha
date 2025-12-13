@@ -111,7 +111,16 @@ if not selectedProxy then
 end
 
 if not selectedProxy then
-  return cjson.encode({success=false, reason='NO_PROXY_AVAILABLE'})
+  -- Allow "no-proxy" as a valid option (session without proxy)
+  for _, proxy in ipairs(proxies) do
+    if proxy == 'no-proxy' then
+      selectedProxy = 'no-proxy'
+      break
+    end
+  end
+  if not selectedProxy then
+    return cjson.encode({success=false, reason='NO_PROXY_AVAILABLE'})
+  end
 end
 
 -- Atomic increment and bind

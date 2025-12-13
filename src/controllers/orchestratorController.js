@@ -622,13 +622,17 @@ async function listWorkersHandler(req, res, next) {
 
 /**
  * POST /api/sessions/provision - Allocate + Start in one call
+ * Body: { sessionId?: string, phone?: string, proxy?: string }
+ * - sessionId: Optional custom session ID
+ * - phone: Optional, will be "pending" until QR scan
+ * - proxy: Optional, manual proxy URL (socks5h://...)
  */
 async function provisionSession(req, res, next) {
   try {
-    const { phone, sessionId: customSessionId, sessionsPath, proxy: customProxy } = req.body;
+    const { phone, sessionId: customSessionId, sessionsPath, proxy: manualProxy } = req.body;
     
-    // Phone is optional - will be filled after QR scan
-    const sessionPhone = phone || "pending";
+    // Phone is optional - will be set after QR scan
+    const phoneValue = phone || "pending";
     
     // Step 1: Generate session ID
     const allocSessionId = customSessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -636,40 +640,23 @@ async function provisionSession(req, res, next) {
     const { getRedis } = require("../infra/redis");
     const redis = getRedis();
     
-    // Get available proxies from system
-    let availableProxies = await redis.smembers('proxies:available');
+    // Step 2: Get proxy - either manual or from inventory
+    let proxyToUse = manualProxy || null;
+    let availableProxies = [];
     
-    // If user provided a custom proxy, add it to the list
-    if (customProxy && typeof customProxy === 'string' && customProxy.trim()) {
-      // Add custom proxy to the system
-      await redis.sadd('proxies:available', customProxy.trim());
-      availableProxies = [customProxy.trim(), ...availableProxies];
+    if (!proxyToUse) {
+      // Try to get from inventory
+      availableProxies = await redis.smembers('proxies:available') || [];
+      if (availableProxies.length > 0) {
+        proxyToUse = availableProxies[0];
+      }
     }
     
-    // Allow session creation without proxy (for testing/development)
-    const hasProxies = availableProxies && availableProxies.length > 0;
+    // Proxy is optional - worker can run without proxy
+    // (but anti-ban will be less effective)
     
-    // Step 2: Allocate session (with or without proxy)
-    let allocResult;
-    if (hasProxies) {
-      allocResult = await allocateSession(sessionPhone, allocSessionId, availableProxies);
-    } else {
-      // Create session without proxy allocation
-      allocResult = {
-        success: true,
-        sessionId: allocSessionId,
-        proxyId: null,
-        phone: sessionPhone
-      };
-      
-      // Store session in Redis manually (without proxy)
-      await redis.hset(`session:${allocSessionId}`, {
-        phone: sessionPhone,
-        status: 'PENDING',
-        proxyId: '',
-        createdAt: Date.now().toString()
-      });
-    }
+    // Step 3: Allocate session
+    const allocResult = await allocateSession(phoneValue, allocSessionId, availableProxies.length > 0 ? availableProxies : ['no-proxy']);
     
     if (!allocResult.success) {
       return res.status(409).json({ 
@@ -679,11 +666,17 @@ async function provisionSession(req, res, next) {
       });
     }
     
-    // Step 3: Start worker container
+    // Step 4: Store proxy info if manual
+    if (manualProxy) {
+      await redis.hset(`session:${allocResult.sessionId}`, 'proxy', manualProxy);
+      await redis.hset(`session:${allocResult.sessionId}`, 'proxySource', 'manual');
+    }
+    
+    // Step 5: Start worker container
     const startResult = await startWorker(allocResult.sessionId, {
       webhookSecret: config.webhookSecret,
       sessionsPath,
-      proxyUrl: allocResult.proxyId || customProxy || null
+      proxy: proxyToUse // Pass proxy to worker
     });
     
     if (!startResult.success) {
@@ -699,14 +692,14 @@ async function provisionSession(req, res, next) {
     return res.status(201).json({
       status: "ok",
       sessionId: allocResult.sessionId,
-      phone: sessionPhone,
-      proxyId: allocResult.proxyId || customProxy || null,
+      phone: phoneValue,
+      proxyId: allocResult.proxyId || null,
+      proxy: proxyToUse ? "configured" : "none",
       containerId: startResult.containerId,
       containerName: startResult.containerName,
       message: "Session provisioned and worker started"
     });
   } catch (err) {
-    console.error("[provisionSession] Error:", err);
     return next(err);
   }
 }
