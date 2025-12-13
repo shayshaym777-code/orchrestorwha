@@ -634,6 +634,13 @@
                     <label class="form-label">מזהה סשן (אופציונלי)</label>
                     <input type="text" class="form-input" id="sessionIdInput" placeholder="יווצר אוטומטית">
                 </div>
+                <div class="form-group">
+                    <label class="form-label">🌐 פרוקסי (אופציונלי)</label>
+                    <input type="text" class="form-input" id="proxyInput" placeholder="socks5h://user:pass@host:port">
+                    <p style="font-size: 11px; color: #666; margin-top: 5px;">
+                        השאר ריק אם אין פרוקסי או אם יש פרוקסיים במערכת
+                    </p>
+                </div>
                 <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
                     📱 מספר הטלפון יתקבל אוטומטית אחרי סריקת ה-QR
                 </p>
@@ -889,17 +896,20 @@
         async function addSession(e) {
             e.preventDefault();
             const sessionId = document.getElementById('sessionIdInput').value.trim();
+            const proxy = document.getElementById('proxyInput').value.trim();
             
             const result = await api('/api/sessions/provision', {
                 method: 'POST',
                 body: JSON.stringify({ 
-                    sessionId: sessionId || undefined 
+                    sessionId: sessionId || undefined,
+                    proxy: proxy || undefined
                 })
             });
             
             if (result && result.status === 'ok') {
                 closeModal();
                 document.getElementById('sessionIdInput').value = '';
+                document.getElementById('proxyInput').value = '';
                 refreshDashboard();
                 alert('סשן נוצר! סרוק את ה-QR כדי להתחבר.\n\nSession ID: ' + (result.sessionId || ''));
             } else {
