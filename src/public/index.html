@@ -678,11 +678,15 @@
                         ...options.headers
                     }
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return await response.json();
+                const data = await response.json();
+                if (!response.ok) {
+                    console.error(`API Error ${response.status}:`, data);
+                    return { status: 'error', reason: data.reason || data.message || `HTTP ${response.status}` };
+                }
+                return data;
             } catch (err) {
                 console.error(`API Error:`, err);
-                return null;
+                return { status: 'error', reason: err.message };
             }
         }
         
