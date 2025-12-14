@@ -623,16 +623,21 @@ async function listWorkersHandler(req, res, next) {
 /**
  * POST /api/sessions/provision - Allocate + Use existing docker-compose worker
  * Body: { sessionId?: string, phone?: string, proxy?: string }
+<<<<<<< HEAD
  * - sessionId: Optional custom session ID (if not provided, uses available worker_1/2/3)
  * - phone: Optional, will be "pending" until QR scan
+=======
+ * - sessionId: Optional custom session ID
+ * - phone: Optional, will be unique placeholder until QR scan
+>>>>>>> 4b32995c01a7a4b8268075a7b33c918a16224e1c
  * - proxy: Optional, manual proxy URL (socks5h://...)
  */
 async function provisionSession(req, res, next) {
   try {
     const { phone, sessionId: customSessionId, sessionsPath, proxy: manualProxy } = req.body;
     
-    // Phone is optional - will be set after QR scan
-    const phoneValue = phone || "pending";
+    // Phone is optional - generate unique placeholder for OBS/auto sessions
+    const phoneValue = phone || `pending_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     
     const { getRedis } = require("../infra/redis");
     const redis = getRedis();

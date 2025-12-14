@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS QR Display</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: transparent;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 0 100px rgba(37, 211, 102, 0.1);
+      border: 2px solid rgba(37, 211, 102, 0.3);
+      text-align: center;
+      min-width: 380px;
+    }
+    
+    .header {
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      color: #25D366;
+      font-size: 28px;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .header .subtitle {
+      color: #8892b0;
+      font-size: 14px;
+    }
+    
+    .qr-frame {
+      background: white;
+      border-radius: 20px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 280px;
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .qr-frame::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(
+        45deg,
+        transparent 40%,
+        rgba(37, 211, 102, 0.1) 50%,
+        transparent 60%
+      );
+      animation: shine 3s infinite;
+    }
+    
+    @keyframes shine {
+      0% { transform: translateX(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) rotate(45deg); }
+    }
+    
+    #qr-image {
+      max-width: 240px;
+      max-height: 240px;
+      border-radius: 10px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      color: #666;
+    }
+    
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #25D366;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 12px;
+      font-size: 16px;
+    }
+    
+    .status.waiting {
+      background: rgba(255, 193, 7, 0.1);
+      color: #FFC107;
+      border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    
+    .status.ready {
+      background: rgba(37, 211, 102, 0.1);
+      color: #25D366;
+      border: 1px solid rgba(37, 211, 102, 0.3);
+    }
+    
+    .status.connected {
+      background: rgba(33, 150, 243, 0.1);
+      color: #2196F3;
+      border: 1px solid rgba(33, 150, 243, 0.3);
+    }
+    
+    .status.error {
+      background: rgba(244, 67, 54, 0.1);
+      color: #F44336;
+      border: 1px solid rgba(244, 67, 54, 0.3);
+    }
+    
+    .session-info {
+      margin-top: 15px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #8892b0;
+    }
+    
+    .session-info .label {
+      color: #64ffda;
+    }
+    
+    .counter {
+      font-size: 18px;
+      font-weight: bold;
+      color: #25D366;
+      margin-top: 10px;
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 600;
+    }
+    
+    .btn-primary {
+      background: #25D366;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #128C7E;
+      transform: scale(1.05);
+    }
+    
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .footer {
+      margin-top: 20px;
+      font-size: 11px;
+      color: #5a6270;
+    }
+    
+    .proxy-indicator {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(100, 255, 218, 0.1);
+      border: 1px solid rgba(100, 255, 218, 0.3);
+      border-radius: 4px;
+      color: #64ffda;
+      font-size: 11px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📱 WhatsApp QR</h1>
+      <div class="subtitle">סרוק כדי להתחבר</div>
+    </div>
+    
+    <div class="qr-frame">
+      <div id="qr-content">
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>מייצר סשן חדש...</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="status" class="status waiting">
+      ⏳ ממתין ליצירת סשן...
+    </div>
+    
+    <div id="session-info" class="session-info" style="display: none;">
+      <span class="label">Session:</span> <span id="session-id">-</span><br>
+      <span id="proxy-display" class="proxy-indicator" style="display: none;">🌐 Proxy: <span id="proxy-id">-</span></span>
+      <div class="counter">
+        מחוברים: <span id="connected-count">0</span>
+      </div>
+    </div>
+    
+    <div class="controls">
+      <button class="btn btn-primary" onclick="createNewSession()">🔄 סשן חדש</button>
+      <button class="btn btn-secondary" onclick="refreshQR()">↻ רענן QR</button>
+    </div>
+    
+    <div class="footer">
+      OBS Display Mode | Auto-refresh enabled
+    </div>
+  </div>
+
+  <script>
+    // קרא API Key ופרוקסי מ-URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const API_KEY = urlParams.get('key') || localStorage.getItem('wa_api_key') || 'test-key';
+    const FIXED_PROXY = urlParams.get('proxy') || null; // פרוקסי קבוע מה-URL
+    
+    let currentSessionId = null;
+    let pollInterval = null;
+    let isCreatingSession = false;
+    let connectedCount = 0;
+    let lastQRData = null;
+    
+    // אתחול
+    document.addEventListener('DOMContentLoaded', () => {
+      createNewSession();
+    });
+    
+    // יצירת סשן חדש עם פרוקסי
+    async function createNewSession() {
+      if (isCreatingSession) return;
+      isCreatingSession = true;
+      
+      // עצור polling קודם
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      
+      updateStatus('waiting', '⏳ יוצר סשן חדש...');
+      showLoading();
+      
+      try {
+        const body = {};
+        
+        // אם יש פרוקסי קבוע - השתמש בו
+        if (FIXED_PROXY) {
+          body.proxy = FIXED_PROXY;
+        }
+        
+        const response = await fetch('/api/sessions/provision', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': API_KEY
+          },
+          body: JSON.stringify(body)
+        });
+        
+        const data = await response.json();
+        
+        if (data.sessionId) {
+          currentSessionId = data.sessionId;
+          document.getElementById('session-id').textContent = currentSessionId.slice(-12);
+          document.getElementById('session-info').style.display = 'block';
+          
+          // הצג פרוקסי אם יש
+          if (data.proxyId || FIXED_PROXY) {
+            document.getElementById('proxy-display').style.display = 'inline-block';
+            document.getElementById('proxy-id').textContent = (data.proxyId || FIXED_PROXY).slice(-15);
+          }
+          
+          updateStatus('ready', '✅ סשן נוצר! ממתין ל-QR...');
+          startPolling(currentSessionId);
+        } else if (data.error || data.reason) {
+          throw new Error(data.reason || data.error || 'Failed to create session');
+        }
+      } catch (err) {
+        console.error('Create session error:', err);
+        updateStatus('error', `❌ שגיאה: ${err.message}`);
+        isCreatingSession = false;
+        
+        // נסה שוב אחרי 10 שניות
+        setTimeout(() => {
+          createNewSession();
+        }, 10000);
+        return;
+      }
+      
+      isCreatingSession = false;
+    }
+    
+    // התחל לעקוב אחרי QR
+    function startPolling(sessionId) {
+      if (pollInterval) clearInterval(pollInterval);
+      
+      // בדוק מיד
+      checkQR(sessionId);
+      
+      // בדוק כל 2 שניות
+      pollInterval = setInterval(() => checkQR(sessionId), 2000);
+    }
+    
+    // בדיקת QR
+    async function checkQR(sessionId) {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/qr`, {
+          headers: { 'X-API-KEY': API_KEY }
+        });
+        
+        const data = await response.json();
+        
+        if (data.qrCode || data.qr) {
+          const qrData = data.qrCode || data.qr;
+          // רק עדכן אם ה-QR השתנה
+          if (qrData !== lastQRData) {
+            lastQRData = qrData;
+            showQR(qrData);
+          }
+          updateStatus('ready', '📱 סרוק את הקוד להתחברות');
+        } else if (data.sessionStatus === 'CONNECTED' || data.status === 'CONNECTED') {
+          // מחובר! עבור לסשן הבא
+          showConnected();
+        } else if (response.status === 404) {
+          // QR עדיין לא מוכן
+          updateStatus('waiting', '⏳ ממתין ל-QR מהשרת...');
+        }
+      } catch (err) {
+        console.error('QR check error:', err);
+      }
+    }
+    
+    // הצגת QR
+    function showQR(qrData) {
+      const qrContent = document.getElementById('qr-content');
+      
+      if (qrData.startsWith('data:image')) {
+        qrContent.innerHTML = `<img id="qr-image" src="${qrData}" alt="QR Code">`;
+      } else {
+        qrContent.innerHTML = `<img id="qr-image" src="${qrData}" alt="QR Code">`;
+      }
+    }
+    
+    // הצגת מצב מחובר ויצירת סשן חדש
+    function showConnected() {
+      connectedCount++;
+      document.getElementById('connected-count').textContent = connectedCount;
+      
+      const qrContent = document.getElementById('qr-content');
+      qrContent.innerHTML = `
+        <div style="text-align: center; color: #25D366;">
+          <div style="font-size: 80px; margin-bottom: 10px;">✅</div>
+          <div style="font-size: 18px; font-weight: bold;">מחובר!</div>
+          <div style="font-size: 14px; color: #888; margin-top: 10px;">יוצר סשן חדש...</div>
+        </div>
+      `;
+      
+      updateStatus('connected', `🟢 מחובר! (${connectedCount} סה"כ)`);
+      
+      // עצור polling
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      
+      lastQRData = null;
+      
+      // אחרי 3 שניות - צור סשן חדש אוטומטית
+      setTimeout(() => {
+        createNewSession();
+      }, 3000);
+    }
+    
+    // הצגת טעינה
+    function showLoading() {
+      const qrContent = document.getElementById('qr-content');
+      qrContent.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>מייצר סשן...</div>
+        </div>
+      `;
+    }
+    
+    // עדכון סטטוס
+    function updateStatus(type, message) {
+      const status = document.getElementById('status');
+      status.className = `status ${type}`;
+      status.innerHTML = message;
+    }
+    
+    // רענון QR
+    function refreshQR() {
+      if (currentSessionId) {
+        lastQRData = null;
+        checkQR(currentSessionId);
+      } else {
+        createNewSession();
+      }
+    }
+  </script>
+</body>
+</html>

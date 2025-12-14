@@ -77,8 +77,8 @@ async function getSessionLimits(sessionId) {
   const redis = getRedis();
   
   // Check for custom config in Redis
-  const customConfig = await redis.hgetall("config:rampSchedule");
-  const schedule = Object.keys(customConfig).length > 0 
+  const customConfig = await redis.hgetall("config:rampSchedule") || {};
+  const schedule = (customConfig && Object.keys(customConfig).length > 0)
     ? JSON.parse(customConfig.schedule || JSON.stringify(DEFAULT_RAMP_SCHEDULE))
     : DEFAULT_RAMP_SCHEDULE;
   
