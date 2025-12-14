@@ -46,16 +46,18 @@ echo ""
 
 # בדיקה 5: API סשנים
 echo "✅ בדיקה 5: API סשנים"
-API_KEY=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 | head -1)
-if [ -z "$API_KEY" ]; then
-    echo "   SKIP: אין API_KEY ב-.env"
+API_KEY=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 | head -1 | tr -d ' ')
+if [ -z "$API_KEY" ] || [ "$API_KEY" = "CHANGE-ME" ]; then
+    echo "   SKIP: אין API_KEY תקין ב-.env"
 else
-    SESSIONS=$(curl -s -H "X-API-KEY: $API_KEY" http://localhost:3001/api/v1/dashboard/sessions 2>/dev/null | grep -c "sessionId" || echo "0")
-    SESSIONS_NUM=$(echo "$SESSIONS" | tr -d ' ')
-    if [ "$SESSIONS_NUM" -gt 0 ] 2>/dev/null; then
-        echo "   PASS: $SESSIONS_NUM סשנים נמצאו"
+    API_RESPONSE=$(curl -s -H "X-API-KEY: $API_KEY" http://localhost:3001/api/v1/dashboard/sessions 2>/dev/null)
+    if echo "$API_RESPONSE" | grep -q "sessionId"; then
+        SESSIONS_COUNT=$(echo "$API_RESPONSE" | grep -o "sessionId" | wc -l)
+        echo "   PASS: $SESSIONS_COUNT סשנים נמצאו"
+    elif echo "$API_RESPONSE" | grep -q "error"; then
+        echo "   FAIL: שגיאת API - $(echo "$API_RESPONSE" | grep -o '"reason":"[^"]*"' | head -1)"
     else
-        echo "   FAIL: אין סשנים או שגיאת API"
+        echo "   FAIL: תגובה לא צפויה"
     fi
 fi
 echo ""
