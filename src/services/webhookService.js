@@ -74,8 +74,15 @@ async function storeWebhookEvent(payload) {
   // Store "latest meta"
   await redis.hset(`session:meta:${sessionId}`, {
     fingerprint: meta.fingerprint ? String(meta.fingerprint) : "",
-    proxy: meta.proxy ? String(meta.proxy) : ""
+    proxy: meta.proxy ? String(meta.proxy) : "",
+    proxyUrl: meta.proxyUrl ? String(meta.proxyUrl) : ""  // ✅ Store full PROXY_URL from worker
   });
+  
+  // ✅ If worker sent PROXY_URL, store it in session record
+  if (meta.proxyUrl && meta.proxyUrl !== 'null' && meta.proxyUrl !== '') {
+    await redis.hset(sessionKey, 'proxy', String(meta.proxyUrl));
+    await redis.hset(sessionKey, 'proxySource', 'from-worker-env');
+  }
 
   // Keep a capped event log (latest 200)
   const eventsKey = `session:events:${sessionId}`;

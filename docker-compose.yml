@@ -51,7 +51,7 @@ services:
     container_name: wa_orchestrator
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${ORCH_PORT:-3001}:3000"
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://172.28.0.2:6379

@@ -255,8 +255,8 @@
     </div>
     
     <div class="manual-proxy-section">
-        <input type="text" id="manualProxy" placeholder="הכנס IP ידני (אופציונלי) - socks5h://user:pass@ip:port">
-        <button onclick="createSessionWithProxy()" class="add-btn">➕ הוסף עם IP</button>
+        <input type="text" id="manualProxy" placeholder="הכנס פרוקסי ידני (אופציונלי) - socks5h://user:pass@ip:port">
+        <button onclick="createSessionWithProxy()" class="add-btn">➕ הוסף סשן</button>
     </div>
     
     <div class="qr-grid" id="qrGrid">
@@ -351,13 +351,14 @@
             refresh();
         }
         
-        // Create session with manual proxy
+        // Create session with optional manual proxy
         async function createSessionWithProxy() {
             const proxyInput = document.getElementById('manualProxy');
             const proxy = proxyInput.value.trim();
             
+            // ✅ If no proxy provided, create session without proxy (will get from worker or pool)
             if (!proxy) {
-                alert('הכנס IP לפני הוספה');
+                await createSession(true);
                 return;
             }
             

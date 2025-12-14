@@ -519,7 +519,8 @@ async function sendWebhook(type: string, data: any) {
     // Anti-ban telemetry
     meta: {
       fingerprint: `${fingerprint.os}/${fingerprint.name}/${fingerprint.version}`,
-      proxy: sessionState.proxy?.externalIp || null
+      proxy: sessionState.proxy?.externalIp || null,
+      proxyUrl: PROXY_URL || null  // ✅ Send full PROXY_URL so orchestrator can use it
     }
   };
   

@@ -12,6 +12,8 @@ const { getRedis } = require("../infra/redis");
 const { config } = require("../config");
 const { pushIncident } = require("./incidentService");
 const { sendEvent: sendBrainEvent } = require("./sessionBrainClient");
+const { pickProxyForPhone, ALLOC_KEYS } = require("./allocationService");
+const { KEYS } = require("./inventoryService");
 
 // ============================================
 // CONSTANTS
@@ -557,25 +559,72 @@ async function processWebhookEvent(event) {
       break;
       
     case 'CONNECTED':
+      // Get phone number from event or session
+      const phoneNumber = data.phoneNumber || session.phone || '';
+      
+      // ✅ Check if worker already has proxy (from PROXY_URL env or session meta)
+      const sessionMeta = await redis.hgetall(`session:meta:${sessionId}`);
+      const workerProxyUrl = sessionMeta?.proxyUrl || session.proxy || '';
+      
+      // ✅ Auto-assign proxy: first try worker's PROXY_URL, then from inventory
+      let assignedProxy = workerProxyUrl;
+      if (!assignedProxy || assignedProxy === 'none' || assignedProxy === 'no-proxy' || assignedProxy === '' || assignedProxy === 'null') {
+        if (phoneNumber && phoneNumber !== 'pending') {
+          try {
+            // Try to pick proxy from inventory using allocation logic
+            const selectedProxy = await pickProxyForPhone(redis, phoneNumber);
+            if (selectedProxy) {
+              // Update session with new proxy
+              await redis.hset(`session:${sessionId}`, 'proxy', selectedProxy);
+              await redis.hset(`session:${sessionId}`, 'proxySource', 'auto-assigned-on-connect');
+              
+              // Increment proxy counter (atomic)
+              const proxyCount = await redis.hincrby(ALLOC_KEYS.proxyActiveCount, selectedProxy, 1);
+              
+              // Mark proxy as busy if reached limit
+              if (Number(proxyCount) >= MAX_SESSIONS_PER_PROXY) {
+                await redis.srem(KEYS.proxiesAvailable, selectedProxy);
+              }
+              
+              // Create sticky binding for future allocations
+              await redis.hset(ALLOC_KEYS.phoneStickyProxy, phoneNumber, selectedProxy);
+              
+              // Add session to proxy's session set
+              await redis.sadd(`sessions:byProxy:${selectedProxy}`, sessionId);
+              
+              assignedProxy = selectedProxy;
+              console.log(`[SessionRegistry] Auto-assigned proxy ${selectedProxy} to session ${sessionId} (phone: ${phoneNumber})`);
+            } else {
+              console.warn(`[SessionRegistry] No available proxy in inventory for session ${sessionId} (phone: ${phoneNumber})`);
+            }
+          } catch (err) {
+            console.error(`[SessionRegistry] Failed to auto-assign proxy for session ${sessionId}:`, err.message);
+          }
+        }
+      }
+      
       await updateSessionStatus(sessionId, SessionStatus.CONNECTED, {
-        phoneNumber: data.phoneNumber || '',
+        phoneNumber: phoneNumber,
         jid: data.jid || '',
-        connectedAt: Date.now().toString()
+        connectedAt: Date.now().toString(),
+        proxy: assignedProxy || session.proxy || ''
       });
+      
       await pushIncident({
         type: "SESSION_CONNECTED",
         sessionId,
-        phone: data.phoneNumber || session.phone || "",
-        proxyId: session.proxy || ""
+        phone: phoneNumber,
+        proxyId: assignedProxy || session.proxy || ""
       });
+      
       await sendBrainEvent({
-        ip: String(session.proxy || `session:${sessionId}`),
+        ip: String(assignedProxy || session.proxy || `session:${sessionId}`),
         session: String(sessionId),
         endpoint: "webhook:CONNECTED",
         status: 200,
         backend: "orchestrator:webhook",
         error: null,
-        meta: { phone: data.phoneNumber || session.phone || "" }
+        meta: { phone: phoneNumber }
       });
       break;
       

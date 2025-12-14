@@ -621,9 +621,9 @@ async function listWorkersHandler(req, res, next) {
 }
 
 /**
- * POST /api/sessions/provision - Allocate + Start in one call
+ * POST /api/sessions/provision - Allocate + Use existing docker-compose worker
  * Body: { sessionId?: string, phone?: string, proxy?: string }
- * - sessionId: Optional custom session ID
+ * - sessionId: Optional custom session ID (if not provided, uses available worker_1/2/3)
  * - phone: Optional, will be "pending" until QR scan
  * - proxy: Optional, manual proxy URL (socks5h://...)
  */
@@ -634,11 +634,33 @@ async function provisionSession(req, res, next) {
     // Phone is optional - will be set after QR scan
     const phoneValue = phone || "pending";
     
-    // Step 1: Generate session ID
-    const allocSessionId = customSessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    
     const { getRedis } = require("../infra/redis");
     const redis = getRedis();
+    
+    // ✅ Step 1: Find available docker-compose worker (worker_1, worker_2, worker_3)
+    const availableWorkers = ['worker_1', 'worker_2', 'worker_3'];
+    let selectedWorkerId = customSessionId || null;
+    
+    if (!selectedWorkerId) {
+      // Find first available worker (not already in use)
+      for (const workerId of availableWorkers) {
+        const existingSession = await redis.hgetall(`session:${workerId}`);
+        // Check if worker is free (no session or status is STOPPED/LOGGED_OUT)
+        if (!existingSession || Object.keys(existingSession).length === 0 || 
+            existingSession.status === 'STOPPED' || existingSession.status === 'LOGGED_OUT') {
+          selectedWorkerId = workerId;
+          break;
+        }
+      }
+      
+      if (!selectedWorkerId) {
+        return res.status(503).json({ 
+          status: "error", 
+          reason: "NO_WORKERS_AVAILABLE",
+          message: "All workers (worker_1, worker_2, worker_3) are in use. Please wait or release a session."
+        });
+      }
+    }
     
     // Step 2: Get proxy - either manual or from inventory
     let proxyToUse = manualProxy || null;
@@ -655,8 +677,8 @@ async function provisionSession(req, res, next) {
     // Proxy is optional - worker can run without proxy
     // (but anti-ban will be less effective)
     
-    // Step 3: Allocate session
-    const allocResult = await allocateSession(phoneValue, allocSessionId, availableProxies.length > 0 ? availableProxies : ['no-proxy']);
+    // Step 3: Allocate session using worker ID as session ID
+    const allocResult = await allocateSession(phoneValue, selectedWorkerId, availableProxies.length > 0 ? availableProxies : ['no-proxy']);
     
     if (!allocResult.success) {
       return res.status(409).json({ 
@@ -668,36 +690,38 @@ async function provisionSession(req, res, next) {
     
     // Step 4: Store proxy info if manual
     if (manualProxy) {
-      await redis.hset(`session:${allocResult.sessionId}`, 'proxy', manualProxy);
-      await redis.hset(`session:${allocResult.sessionId}`, 'proxySource', 'manual');
+      await redis.hset(`session:${selectedWorkerId}`, 'proxy', manualProxy);
+      await redis.hset(`session:${selectedWorkerId}`, 'proxySource', 'manual');
     }
     
-    // Step 5: Start worker container
-    const startResult = await startWorker(allocResult.sessionId, {
-      webhookSecret: config.webhookSecret,
-      sessionsPath,
-      proxy: proxyToUse // Pass proxy to worker
-    });
+    // ✅ Step 5: Worker already exists in docker-compose - just register the session
+    // The worker container (wa_worker_1, wa_worker_2, etc.) is already running
+    // We just need to make sure the session is registered in Redis
     
-    if (!startResult.success) {
-      // Rollback: release the session
-      await releaseSession(allocResult.sessionId);
-      return res.status(500).json({ 
-        status: "error", 
-        reason: startResult.error,
-        phase: "docker_start"
-      });
+    // Check if worker container is running
+    const containerName = `wa_${selectedWorkerId}`;
+    try {
+      const docker = require("dockerode")();
+      const container = docker.getContainer(containerName);
+      const info = await container.inspect();
+      
+      if (!info.State.Running) {
+        // Worker container exists but not running - start it
+        await container.start();
+      }
+    } catch (e) {
+      // Container doesn't exist - that's OK, docker-compose will start it
+      console.log(`[Provision] Worker container ${containerName} will be managed by docker-compose`);
     }
     
     return res.status(201).json({
       status: "ok",
-      sessionId: allocResult.sessionId,
+      sessionId: selectedWorkerId,
       phone: phoneValue,
       proxyId: allocResult.proxyId || null,
       proxy: proxyToUse ? "configured" : "none",
-      containerId: startResult.containerId,
-      containerName: startResult.containerName,
-      message: "Session provisioned and worker started"
+      containerName: containerName,
+      message: `Session allocated to existing worker: ${selectedWorkerId}`
     });
   } catch (err) {
     return next(err);
